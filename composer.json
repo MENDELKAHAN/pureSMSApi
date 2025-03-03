@@ -1,20 +1,19 @@
-
-    "name": "mendy/laravel-puresms",
+{
+    "name": "mendelkahan/laravel-puresms",
     "description": "Laravel package for PureSMS integration.",
     "type": "library",
+    "license": "MIT",
     "autoload": {
         "psr-4": {
             "Puresms\\Laravel\\": "src/"
         }
     },
-
     "authors": [
         {
             "name": "Mendel Kahan",
             "email": "mendy@famkahan.com"
         }
     ],
-
     "require": {
         "php": ">=8.0",
         "illuminate/support": "^10"
@@ -28,5 +27,7 @@
                 "PureSms": "Puresms\\Laravel\\Facades\\PureSms"
             }
         }
-    }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }
