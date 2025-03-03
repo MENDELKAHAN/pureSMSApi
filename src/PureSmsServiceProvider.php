@@ -30,9 +30,8 @@ class PureSmsServiceProvider extends ServiceProvider
     }
 
     // Load routes from the package
-    if (file_exists(__DIR__.'/../routes/api.php')) {
-        $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
-    }}
+    $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+
 
 }
 
