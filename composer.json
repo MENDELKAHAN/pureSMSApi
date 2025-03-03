@@ -4,12 +4,13 @@
     "type": "library",
     "license": "MIT",
     "autoload": {
-        "psr-4": {
-            "Puresms\\Laravel\\": "src/",
-            "Puresms\\Laravel\\Channels\\": "src/Channels/",
-            "Puresms\\Laravel\\Models\\": "src/Models/"
-        }
-    },
+    "psr-4": {
+        "Puresms\\Laravel\\": "src/",
+        "Puresms\\Laravel\\Channels\\": "src/Channels/",
+        "Puresms\\Laravel\\Models\\": "src/Models/"
+    }
+},
+
     "authors": [
         {
             "name": "Mendel Kahan",
