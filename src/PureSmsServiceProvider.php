@@ -16,21 +16,21 @@ class PureSmsServiceProvider extends ServiceProvider
     }
 
   	public function boot()
-	{
-	    if ($this->app->runningInConsole()) {
-	        // Publish config file
-	        $this->publishes([
-	            __DIR__.'/../config/puresms.php' => config_path('puresms.php'),
-	        ], 'puresms-config');
+{
+    if ($this->app->runningInConsole()) {
+        // Publish config file
+        $this->publishes([
+            __DIR__.'/../config/puresms.php' => config_path('puresms.php'),
+        ], 'puresms-config');
 
-	        // Publish migrations
-	        $this->publishes([
-	            __DIR__.'/../database/migrations/' => database_path('migrations'),
-	        ], 'puresms-migrations');
+        // Publish migrations
+        $this->publishes([
+            __DIR__.'/../database/migrations/' => database_path('migrations'),
+        ], 'puresms-migrations');
+    }
 
+    // Load routes from the package
+    $this->loadRoutesFrom(__DIR__.'/../../routes/api.php'); // Adjusted path
+}
 
-	        $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
-
-	    }
-	}
 }
