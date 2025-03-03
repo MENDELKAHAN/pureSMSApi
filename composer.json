@@ -5,7 +5,9 @@
     "license": "MIT",
     "autoload": {
         "psr-4": {
-            "Puresms\\Laravel\\": "src/"
+            "Puresms\\Laravel\\": "src/",
+            "Puresms\\Laravel\\Channels\\": "src/Channels/"
+
         }
     },
     "authors": [
