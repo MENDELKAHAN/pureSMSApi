@@ -32,21 +32,28 @@ php artisan migrate
 
 
 Set up your API key and endpoint in .env:
+```bash
+
 PURESMS_API_KEY=your_api_key_here
 PURESMS_ENDPOINT=https://connect-api.divergent.cloud
+```
 
 📤 Sending SMS
 
 You can send an SMS using the PureSms facade:
+```bash
 
 use Puresms\Laravel\Facades\PureSms;
 $response = PureSms::sendSms('+447123456789', 'Hello from Laravel!');
-
+```
 
 📥 Handling Webhooks
+
+```bash
+
 use App\Http\Controllers\SmsController;
 Route::post('/puresms-webhook', [SmsController::class, 'handleWebhook']);
-
+```
 ## 📊 Database Logging
 
 All sent messages are **automatically stored** in the database in the `sms_logs` table.
@@ -67,6 +74,7 @@ All sent messages are **automatically stored** in the database in the `sms_logs`
 
 🎯 Example Usage
 Send an SMS & Check Delivery Status
+```bash
 
 use Puresms\Laravel\Facades\PureSms;
 use Puresms\Laravel\Models\SmsLog;
@@ -77,9 +85,12 @@ $sms = PureSms::sendSms('+447123456789', 'Test message');
 // Check SMS Status in the database
 $log = SmsLog::where('message_id', $sms['id'])->first();
 echo 'Status: ' . $log->status;
-
+```
 🛠️ Updating the Package
+```bash
+
 composer update mendelkahan/puresmsapi
 php artisan migrate
+```
 
 
