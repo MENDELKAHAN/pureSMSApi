@@ -1,0 +1,30 @@
+# Ignore vendor folder (installed dependencies)
+vendor/
+
+# Ignore Composer lock file (optional, but recommended)
+composer.lock
+
+# Ignore IDE/Editor files (VSCode, PHPStorm, etc.)
+.vscode/
+.idea/
+
+# Ignore cache and log files
+storage/
+bootstrap/cache/
+
+# Ignore environment and credentials
+.env
+.env.local
+.env.testing
+.env.production
+
+# Ignore node_modules if you ever use npm
+node_modules/
+
+# Ignore compiled files
+*.log
+*.cache
+
+# Ignore OS-generated files
+.DS_Store
+Thumbs.db
