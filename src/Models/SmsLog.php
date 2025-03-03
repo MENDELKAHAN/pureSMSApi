@@ -1,5 +1,4 @@
 <?php
-
 namespace Puresms\Laravel\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;

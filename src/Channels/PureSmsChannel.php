@@ -5,7 +5,8 @@ namespace Puresms\Laravel\Channels;
 
 use Illuminate\Notifications\Notification;
 use Puresms\Laravel\Facades\PureSms;
-use Puresms\Models\SmsLog; // Ensure the model exists
+use Puresms\Laravel\Models\SmsLog; // Correct the namespace
+
 
 class PureSmsChannel
 {
