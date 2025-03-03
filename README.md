@@ -20,14 +20,15 @@ First, install the package via Composer:
 
 ```bash
 composer require mendelkahan/puresmsapi
-
+```
 
 Then, publish the configuration and migration files:
+```bash
 
 php artisan vendor:publish --tag=puresms-config
 php artisan vendor:publish --tag=puresms-migrations
 php artisan migrate
-
+```
 
 
 Set up your API key and endpoint in .env:
