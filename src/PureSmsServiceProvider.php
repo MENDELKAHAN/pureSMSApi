@@ -27,6 +27,10 @@ class PureSmsServiceProvider extends ServiceProvider
 	        $this->publishes([
 	            __DIR__.'/../database/migrations/' => database_path('migrations'),
 	        ], 'puresms-migrations');
+
+
+	        $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+
 	    }
 	}
 }
