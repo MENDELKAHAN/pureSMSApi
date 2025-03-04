@@ -94,3 +94,27 @@ php artisan migrate
 ```
 
 
+using Bulk Sms example
+
+Open tinker
+```bash
+php artisan tinker
+```
+
+this is based that users have sms_number
+```bash
+$puresms = app(Puresms\Laravel\PureSmsService::class);
+
+$users = User::get(); 
+
+$messages = $users->map(function ($user) {
+    return [
+        'sender' => 'ConnectTest',
+        'recipient' => $user->sms_number ?? "", 
+        'content' => "Hello {$user->name}, 
+    ];
+})->filter(fn ($msg) => $msg['recipient'] !== null)->toArray();
+
+$response = $puresms->sendSmsBatch($messages);
+```
+
