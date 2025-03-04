@@ -15,7 +15,7 @@ class PureSmsService
     public function __construct()
     {
         $this->apiKey = config('puresms.api_key');
-        $this->endpoint = config('puresms.endpoint');
+        $this->baseUrl = config('puresms.endpoint');
     }
 
     /**
