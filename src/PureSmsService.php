@@ -83,6 +83,82 @@ class PureSmsService
         }
     }
 
+
+    public function sendSmsBatch(array $messages, ?string $sendAtUtc = null)
+{
+    // Ensure messages array is properly structured
+    $payload = [
+        'messages' => array_map(function ($message) {
+            return [
+                'sender' => $message['sender'] ?? env('PURESMS_SENDER', 'ConnectTest'),
+                'recipient' => $message['recipient'],
+                'content' => $message['content']
+            ];
+        }, $messages)
+    ];
+
+    // Include scheduled time if provided
+    if ($sendAtUtc) {
+        $payload['sendAtUtc'] = $sendAtUtc;
+    }
+
+    // Convert payload to JSON
+    $jsonPayload = json_encode($payload);
+
+    try {
+        // Make API request
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'Content-Length' => strlen($jsonPayload),
+            'X-API-Key' => $this->apiKey,
+        ])->post("{$this->endpoint}/sms/send/bulk", $payload);
+
+        // Get response data
+        $responseData = $response->json();
+
+        // Log batch messages in the database
+        foreach ($messages as $message) {
+            SmsLog::create([
+                'batch_id' => $responseData['batchId'] ?? null,
+                'recipient' => $message['recipient'],
+                'sender' => $message['sender'] ?? env('PURESMS_SENDER', 'ConnectTest'),
+                'content' => $message['content'],
+                'status' => $response->successful() ? 'sent' : 'failed',
+                'error_code' => $response->successful() ? null : $response->status(),
+                'processed_at' => now(),
+            ]);
+        }
+
+        // Log API response
+        Log::info('PureSMS Bulk API Response:', [
+            'status' => $response->status(),
+            'batch_id' => $responseData['batchId'] ?? null,
+            'message_count' => $responseData['messageCount'] ?? null,
+            'body' => $response->body(),
+            'headers' => $response->headers()
+        ]);
+
+        return [
+            'status' => $response->successful() ? 'success' : 'failed',
+            'batch_id' => $responseData['batchId'] ?? null,
+            'message_count' => $responseData['messageCount'] ?? null,
+            'body' => $responseData,
+            'headers' => $response->headers()
+        ];
+    } catch (\Exception $e) {
+        // Log errors
+        Log::error('PureSMS Bulk API Error:', ['message' => $e->getMessage()]);
+
+        return [
+            'error' => true,
+            'message' => $e->getMessage()
+        ];
+    }
+}
+
+
+
+
     /**
      * Handle incoming webhook from PureSMS.
      */
