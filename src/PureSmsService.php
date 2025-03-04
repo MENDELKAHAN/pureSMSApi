@@ -15,7 +15,7 @@ class PureSmsService
     public function __construct()
     {
         $this->apiKey = config('puresms.api_key');
-        $this->baseUrl = config('puresms.endpoint');
+        $this->endpoint = config('puresms.endpoint');
     }
 
     /**
@@ -38,7 +38,7 @@ class PureSmsService
                 'Content-Type' => 'application/json',
                 'Content-Length' => strlen($jsonPayload),
                 'X-API-Key' => $this->apiKey,
-            ])->post("{$this->baseUrl}/sms/send", $payload);
+            ])->post("{$this->endpoint}/sms/send", $payload);
 
             // Get response data
             $responseData = $response->json();
