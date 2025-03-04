@@ -33,7 +33,7 @@ class PureSmsChannel
         SmsLog::create([
             'message_id' => $response['id'] ?? null,
             'recipient'  => $recipient,
-            'sender'     => config('puresms.sender_name', 'PureSms'),
+            'sender'     => config('puresms.sender_name', 'ConnectTest'),
             'content'    => $message,
             'status'     => 'pending', // Default status
             'error_code' => $response['error_code'] ?? null,
