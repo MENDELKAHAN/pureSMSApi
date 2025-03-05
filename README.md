@@ -74,11 +74,13 @@ All sent messages are **automatically stored** in the database in the `sms_logs`
 | `message_id` | string    | Unique message ID from PureSMS            |
 | `recipient`  | string    | Recipient's phone number                  |
 | `sender`     | string    | Sender name or number                     |
+| `recipient_id`  | int    | Recipient's user_id                       |
+| `sender_id`     | int    | Sender user id                            |
 | `content`    | text      | SMS message content                       |
 | `status`     | string    | `pending`, `sent`, `delivered`, etc.      |
 | `error_code` | integer   | Error code (if any)                       |
-| `processed_at` | timestamp | When it was processed                  |
-| `delivered_at` | timestamp | When it was delivered                  |
+| `processed_at` | timestamp | When it was processed                   |
+| `delivered_at` | timestamp | When it was delivered                   |
 
 
 
