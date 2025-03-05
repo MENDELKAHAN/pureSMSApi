@@ -6,5 +6,6 @@ return [
     'puresms' => env('PURESMS_SENDER', 'ConnectTest'),
 
 
-    'model' => \mendelkahan\laravel-puresms\Models\SmsLog::class,
+    'model' => \mendelkahan\LaravelPuresms\Models\SmsLog::class,
+,
 ];
