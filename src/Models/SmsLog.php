@@ -6,6 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 class SmsLog extends Model
 {
     protected $fillable = [
-        'message_id', 'recipient', 'sender', 'content', 'status', 'error_code', 'processed_at', 'delivered_at'
+        'message_id', 'recipient', 'sender', 'recipient_id', 'sender_id', 'content', 'status', 'error_code', 'processed_at', 'delivered_at'
     ];
+
+    public function sender()
+    {
+        return $this->belongsTo(User::class, 'sender_id');
+    }
+
+    public function recipient()
+    {
+        return $this->belongsTo(User::class, 'recipient_id');
+    }
 }

@@ -10,8 +10,15 @@ return new class extends Migration {
         Schema::create('sms_logs', function (Blueprint $table) {
             $table->id();
             $table->string('message_id')->unique();
-            $table->string('recipient');
-            $table->string('sender')->nullable();
+           
+
+            // $table->string('recipient');
+            // $table->string('sender')->nullable();
+
+            $table->unsignedBigInteger('recipient_id');
+            $table->unsignedBigInteger('sender_id')->nullable();
+
+
             $table->text('content');
             $table->string('status')->default('pending');
             $table->integer('error_code')->nullable();
