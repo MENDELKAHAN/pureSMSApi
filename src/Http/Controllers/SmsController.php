@@ -34,8 +34,4 @@ class SmsController extends Controller
         return response()->json($response);
     }
 
-    public function handleWebhook(Request $request)
-    {
-        return $this->smsService->handleWebhook($request);
-    }
 }

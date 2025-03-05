@@ -49,10 +49,20 @@ $response = PureSms::sendSms('+447123456789', 'Hello from Laravel!');
 
 📥 Handling Webhooks
 
+
+
+
+
+
+
+
+
 ```bash
 
-use App\Http\Controllers\SmsController;
-Route::post('/puresms-webhook', [SmsController::class, 'handleWebhook']);
+#use App\Http\Controllers\SmsController;
+#Route::post('/puresms-webhook', [SmsController::class, 'handleWebhook']);
+
+Route::puresmsWebhooks('puresms-webhook');
 ```
 ## 📊 Database Logging
 
