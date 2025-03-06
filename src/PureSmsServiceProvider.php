@@ -3,8 +3,7 @@
 namespace Puresms\Laravel;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route;
-
+use Illuminate\Support\Facades\Route; // <-- The correct Route facade
 
 class PureSmsServiceProvider extends ServiceProvider
 {
