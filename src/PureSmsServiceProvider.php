@@ -3,6 +3,8 @@
 namespace Puresms\Laravel;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
+
 
 class PureSmsServiceProvider extends ServiceProvider
 {
@@ -43,10 +45,10 @@ class PureSmsServiceProvider extends ServiceProvider
          * -----------------------------------------------------
          */
         Route::macro('puresmsWebhooks', function ($uri = 'puresms-webhook') {
-            // Adjust controller & method as needed
-            return Route::post($uri, [\Puresms\Laravel\Http\Controllers\WebhookController::class, 'handle'])
-                ->name('puresms.webhook');
-        });
+    return Route::post($uri, [\Puresms\Laravel\Http\Controllers\WebhookController::class, 'handle'])
+        ->name('puresms.webhook');
+});
+
     }
 }
 
