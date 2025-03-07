@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+// namespace App\Http\Controllers;
+namespace Mendelkahan\LaravelPuresms\Http\Controllers;
+
 
 use Illuminate\Http\Request;
 use App\Services\PureSmsService;
