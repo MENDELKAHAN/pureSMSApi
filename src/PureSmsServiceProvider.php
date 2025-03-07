@@ -36,17 +36,6 @@ class PureSmsServiceProvider extends ServiceProvider
 
     
 
-<?php
-namespace Mendelkahan\LaravelPuresms\Providers;
-
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\ServiceProvider;
-
-class PureSmsServiceProvider extends ServiceProvider
-{
-    public function boot()
-
-{
 
 
         Route::macro('puresmsWebhooks', function ($uri = 'puresms-webhook') {
