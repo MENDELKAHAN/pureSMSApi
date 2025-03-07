@@ -44,8 +44,11 @@ class PureSmsServiceProvider extends ServiceProvider
          * -----------------------------------------------------
          */
         Route::macro('puresmsWebhooks', function ($uri = 'puresms-webhook') {
-            dd($uri);
-            return Route::post($uri, [\Puresms\Laravel\Http\Controllers\PureSMSWebhookController::class, 'handle'])
+
+           
+
+            return Route::post($uri, [\mendelkahan\laravel-puresms\src\Http\Controllers\PureSMSWebhookController::class, 'handle'])
+            // return Route::post($uri, [\Puresms\Laravel\Http\Controllers\PureSMSWebhookController::class, 'handle'])
         ->name('puresms.webhook');
 });
 
