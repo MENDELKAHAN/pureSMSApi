@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Services\PureSmsService;
 
-class WebhookController extends Controller
+class PureSMSWebhookController extends Controller
 {
     protected $smsService;
 
