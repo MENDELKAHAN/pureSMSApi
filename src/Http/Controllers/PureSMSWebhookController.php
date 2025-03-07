@@ -1,10 +1,9 @@
 <?php
-
 namespace Mendelkahan\LaravelPuresms\Http\Controllers;
 
+use App\Http\Controllers\Controller;  // Import the real Controller
 use Illuminate\Http\Request;
 use App\Services\PureSmsService;
-use App\Http\Controllers\Controller; // <-- THIS LINE IS CRUCIAL
 
 class PureSMSWebhookController extends Controller
 {
