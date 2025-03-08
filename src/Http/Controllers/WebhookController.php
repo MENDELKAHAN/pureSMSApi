@@ -4,7 +4,10 @@ namespace Puresms\Laravel\Http\Controllers;
 
 use Illuminate\Routing\Controller;  // Laravel's base controller
 use Illuminate\Http\Request;
-use App\Services\PureSmsService;
+use Puresms\Laravel\PureSmsService;  // Correct import for your service
+
+
+
 
 class WebhookController extends Controller
 {
