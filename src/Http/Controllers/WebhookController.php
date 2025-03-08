@@ -1,10 +1,13 @@
 <?php
+// namespace Mendelkahan\Laravelpuresms\Http\Controllers;
 
-namespace Puresms\Laravel\Http\Controllers;
+// namespace Puresms\LaravelMendelkahan\LaravelPuresms\Http\Controllers;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller; 
+use App\Http\Controllers;  
 use Illuminate\Http\Request;
 use App\Services\PureSmsService;
+
 
 class WebhookController extends Controller
 {
