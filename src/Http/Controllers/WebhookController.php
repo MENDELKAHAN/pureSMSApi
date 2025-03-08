@@ -1,13 +1,10 @@
 <?php
 
-// namespace App\Http\Controllers;
 namespace Puresms\Laravel\Http\Controllers;
 
-
-use App\Http\Controllers;  
+use Illuminate\Routing\Controller;  // Laravel's base controller
 use Illuminate\Http\Request;
 use App\Services\PureSmsService;
-
 
 class WebhookController extends Controller
 {
