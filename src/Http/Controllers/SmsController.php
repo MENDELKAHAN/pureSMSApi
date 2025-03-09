@@ -5,7 +5,7 @@ namespace Puresms\Laravel\Http\Controllers;
 use Illuminate\Routing\Controller;  // Laravel's base controller
 use Illuminate\Http\Request;
 use Puresms\Laravel\PureSmsService;  // Correct import for your service
-
+use App\Models\user;
 
 
 
