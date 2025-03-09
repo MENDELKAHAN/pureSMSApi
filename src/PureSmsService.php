@@ -155,6 +155,7 @@ class PureSmsService
                 'body' => $responseData,
                 'headers' => $response->headers()
             ];
+
         } catch (\Exception $e) {
             // Log errors
             Log::error('PureSMS Bulk API Error:', ['message' => $e->getMessage()]);
@@ -181,35 +182,52 @@ public function handleWebhook(Request $request)
         Log::error('no data');
         return response()->json(['message' => 'Webhook processed'], 200);
     }else{
-    $data = $request->input('data');
+        $data = $request->input('data');
 
-    Log::info('PureSMS Webhook:', [
-        'MessageId'   => $data['MessageId'] ?? null,
-        'Status'      => $data['DeliveryStatus'] ?? null,
-        'ErrorCode'   => $data['ErrorCode'] ?? null,
-        'ProcessedAt' => $data['ProcessedAt'] ?? null,
-        'DeliveredAt' => $data['DeliveredAt'] ?? null,
-    ]);
+        if(! $data -> isEmpty()){
 
-    // Convert ISO8601 timestamp using PHP's DateTime class
-    $processedAt = isset($data['ProcessedAt'])
-        ? (new \DateTime($data['ProcessedAt']))->format('Y-m-d H:i:s')
-        : null;
-    $deliveredAt = isset($data['DeliveredAt'])
-        ? (new \DateTime($data['DeliveredAt']))->format('Y-m-d H:i:s')
-        : null;
+            Log::info('PureSMS Webhook:', [
+                'MessageId'   => $data['MessageId'] ?? null,
+                'Status'      => $data['DeliveryStatus'] ?? null,
+                'ErrorCode'   => $data['ErrorCode'] ?? null,
+                'ProcessedAt' => $data['ProcessedAt'] ?? null,
+                'DeliveredAt' => $data['DeliveredAt'] ?? null,
+            ]);
 
-    // Update SMS status in the database
-    SmsLog::where('message_id', $data['MessageId'])
-        ->update([
-            'status'       => $this->mapDeliveryStatus($data['DeliveryStatus']),
-            'error_code'   => $data['ErrorCode'] ?? null,
-            'processed_at' => $processedAt,
-            'delivered_at' => $deliveredAt,
-        ]);
+            // Convert ISO8601 timestamp using PHP's DateTime class
+            $processedAt = isset($data['ProcessedAt'])
+                ? (new \DateTime($data['ProcessedAt']))->format('Y-m-d H:i:s')
+                : null;
+            $deliveredAt = isset($data['DeliveredAt'])
+                ? (new \DateTime($data['DeliveredAt']))->format('Y-m-d H:i:s')
+                : null;
 
-    return response()->json(['message' => 'Webhook processed'], 200);
-}
+
+            // Update SMS status in the database
+            SmsLog::where('message_id', $data['MessageId'])
+                ->update([
+                    'status'       => $this->mapDeliveryStatus($data['DeliveryStatus']),
+                    'error_code'   => $data['ErrorCode'] ?? null,
+                    'processed_at' => $processedAt,
+                    'delivered_at' => $deliveredAt,
+                ]);
+
+           
+
+        }else{
+
+        Log::error('Data was empty');
+        return response()->json(['message' => 'Webhook processed'], 200);
+
+        }
+
+
+
+
+    }
+
+
+     return response()->json(['message' => 'Webhook processed'], 200);
 }
 
 
