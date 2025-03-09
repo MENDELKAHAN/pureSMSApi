@@ -6,7 +6,7 @@ use Puresms\Laravel\Models\SmsLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-
+use Carbon\Carbon;
 class PureSmsService
 {
     protected $apiKey;
@@ -172,7 +172,7 @@ class PureSmsService
     /**
      * Handle incoming webhook from PureSMS.
      */
-   use Carbon\Carbon;
+   
 
 public function handleWebhook(Request $request)
 {
