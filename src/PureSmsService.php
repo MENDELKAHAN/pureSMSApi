@@ -172,31 +172,41 @@ class PureSmsService
     /**
      * Handle incoming webhook from PureSMS.
      */
-    public function handleWebhook(Request $request)
-    {
+   use Carbon\Carbon;
 
-        Log::error($request);
-        $data = $request->input('data');
+public function handleWebhook(Request $request)
+{
+    Log::error($request);
+    $data = $request->input('data');
 
-        Log::info('PureSMS Webhook:', [
-            'MessageId' => $data['MessageId'] ?? null,
-            'Status' => $data['DeliveryStatus'] ?? null,
-            'ErrorCode' => $data['ErrorCode'] ?? null,
-            'ProcessedAt' => $data['ProcessedAt'] ?? null,
-            'DeliveredAt' => $data['DeliveredAt'] ?? null
+    Log::info('PureSMS Webhook:', [
+        'MessageId'   => $data['MessageId'] ?? null,
+        'Status'      => $data['DeliveryStatus'] ?? null,
+        'ErrorCode'   => $data['ErrorCode'] ?? null,
+        'ProcessedAt' => $data['ProcessedAt'] ?? null,
+        'DeliveredAt' => $data['DeliveredAt'] ?? null,
+    ]);
+
+    // Convert the ISO8601 timestamp to MySQL datetime format
+    $processedAt = isset($data['ProcessedAt'])
+        ? Carbon::parse($data['ProcessedAt'])->format('Y-m-d H:i:s')
+        : null;
+    $deliveredAt = isset($data['DeliveredAt'])
+        ? Carbon::parse($data['DeliveredAt'])->format('Y-m-d H:i:s')
+        : null;
+
+    // Update SMS status in the database
+    SmsLog::where('message_id', $data['MessageId'])
+        ->update([
+            'status'       => $this->mapDeliveryStatus($data['DeliveryStatus']),
+            'error_code'   => $data['ErrorCode'] ?? null,
+            'processed_at' => $processedAt,
+            'delivered_at' => $deliveredAt,
         ]);
 
-        // Update SMS status in the database
-        SmsLog::where('message_id', $data['MessageId'])
-            ->update([
-                'status' => $this->mapDeliveryStatus($data['DeliveryStatus']),
-                'error_code' => $data['ErrorCode'] ?? null,
-                'processed_at' => $data['ProcessedAt'],
-                'delivered_at' => $data['DeliveredAt'] ?? null
-            ]);
+    return response()->json(['message' => 'Webhook processed'], 200);
+}
 
-        return response()->json(['message' => 'Webhook processed'], 200);
-    }
 
     /**
      * Map PureSMS Delivery Status codes to readable statuses.
