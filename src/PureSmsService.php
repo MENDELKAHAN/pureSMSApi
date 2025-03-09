@@ -21,7 +21,7 @@ class PureSmsService
     /**
      * Send an SMS and store it in the database.
      */
-  public function sendSms($to, $message, $from = null, $recipientId = null, $senderId = null)
+public function sendSms($to, $message, $from = null, $recipientId = null, $senderId = null)
 {
     $payload = [
         'sender'    => $from ?? env('PURESMS_SENDER', 'ConnectTest'),
@@ -87,6 +87,7 @@ class PureSmsService
         ];
     }
 }
+
 
 
 
