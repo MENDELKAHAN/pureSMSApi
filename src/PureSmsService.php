@@ -187,12 +187,12 @@ public function handleWebhook(Request $request)
         'DeliveredAt' => $data['DeliveredAt'] ?? null,
     ]);
 
-    // Convert the ISO8601 timestamp to MySQL datetime format
+    // Convert ISO8601 timestamp using PHP's DateTime class
     $processedAt = isset($data['ProcessedAt'])
-        ? Carbon::parse($data['ProcessedAt'])->format('Y-m-d H:i:s')
+        ? (new \DateTime($data['ProcessedAt']))->format('Y-m-d H:i:s')
         : null;
     $deliveredAt = isset($data['DeliveredAt'])
-        ? Carbon::parse($data['DeliveredAt'])->format('Y-m-d H:i:s')
+        ? (new \DateTime($data['DeliveredAt']))->format('Y-m-d H:i:s')
         : null;
 
     // Update SMS status in the database
@@ -206,6 +206,7 @@ public function handleWebhook(Request $request)
 
     return response()->json(['message' => 'Webhook processed'], 200);
 }
+
 
 
     /**
