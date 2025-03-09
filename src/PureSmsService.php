@@ -21,77 +21,73 @@ class PureSmsService
     /**
      * Send an SMS and store it in the database.
      */
-    public function sendSms($to, $message, $from = null)
-    {
-        $payload = [
-            'sender' => $from ?? env('PURESMS_SENDER', 'ConnectTest'),
-            'recipient' => $to,
-            'content' => $message
-        ];
+  public function sendSms($to, $message, $from = null, $recipientId = null, $senderId = null)
+{
+    $payload = [
+        'sender'    => $from ?? env('PURESMS_SENDER', 'ConnectTest'),
+        'recipient' => $to,
+        'content'   => $message,
+    ];
 
-        // Convert array to JSON
-        $jsonPayload = json_encode($payload);
+    // Convert array to JSON
+    $jsonPayload = json_encode($payload);
 
-        try {
-            // Make API request using Laravel's Http facade
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'Content-Length' => strlen($jsonPayload),
-                'X-API-Key' => $this->apiKey,
-            ])->post("{$this->endpoint}/sms/send", $payload);
-            
-            
+    try {
+        // Make API request using Laravel's Http facade
+        $response = Http::withHeaders([
+            'Content-Type'   => 'application/json',
+            'Content-Length' => strlen($jsonPayload),
+            'X-API-Key'      => $this->apiKey,
+        ])->post("{$this->endpoint}/sms/send", $payload);
 
-            // this is to see what i aget from the api 
-            
-            if(is_null($response)){
-                Log::error('PureSMS API Error: No response from Puresms');
-                return false;
-            }
-
-
-            // Get response data
-            $responseData = $response->json();
-
-            // Determine status
-            $status = $response->successful() && isset($responseData['id']) ? 'sent' : 'failed';
-            $messageId = $responseData['id'] ?? null;
-            $errorCode = $response->successful() ? null : $response->status();
-
-            // Log SMS in the database
-            SmsLog::create([
-                'message_id' => $messageId,
-                'recipient' => $to,
-                'sender' => $payload['sender'],
-                'content' => $message,
-                'status' => $status,
-                'error_code' => $errorCode,
-                'processed_at' => now(),
-            ]);
-
-            // Log API response for debugging
-            Log::info('PureSMS API Response:', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-                'headers' => $response->headers()
-            ]);
-
-            return [
-                'status' => $status,
-                'message_id' => $messageId,
-                'body' => $responseData,
-                'headers' => $response->headers()
-            ];
-        } catch (\Exception $e) {
-            // Log errors
-            Log::error('PureSMS API Error:', ['message' => $e->getMessage()]);
-
-            return [
-                'error' => true,
-                'message' => $e->getMessage()
-            ];
+        if (is_null($response)) {
+            Log::error('PureSMS API Error: No response from Puresms');
+            return false;
         }
+
+        // Get response data
+        $responseData = $response->json();
+
+        // Determine status
+        $status = $response->successful() && isset($responseData['id']) ? 'sent' : 'failed';
+        $messageId = $responseData['id'] ?? null;
+        $errorCode = $response->successful() ? null : $response->status();
+
+        // Log SMS in the database using recipient_id and sender_id
+        SmsLog::create([
+            'message_id'   => $messageId,
+            'recipient_id' => $recipientId,
+            'sender_id'    => $senderId,
+            'content'      => $message,
+            'status'       => $status,
+            'error_code'   => $errorCode,
+            'processed_at' => now(),
+        ]);
+
+        // Log API response for debugging
+        Log::info('PureSMS API Response:', [
+            'status'  => $response->status(),
+            'body'    => $response->body(),
+            'headers' => $response->headers(),
+        ]);
+
+        return [
+            'status'     => $status,
+            'message_id' => $messageId,
+            'body'       => $responseData,
+            'headers'    => $response->headers(),
+        ];
+    } catch (\Exception $e) {
+        // Log errors
+        Log::error('PureSMS API Error:', ['message' => $e->getMessage()]);
+
+        return [
+            'error'   => true,
+            'message' => $e->getMessage(),
+        ];
     }
+}
+
 
 
     public function sendSmsBatch(array $messages, ?string $sendAtUtc = null)
