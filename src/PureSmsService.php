@@ -178,13 +178,13 @@ class PureSmsService
 public function handleWebhook(Request $request)
 {
   
-    if ($request->isEmpty()) { 
+    if (empty($request->all())) { 
         Log::error('no data');
         return response()->json(['message' => 'Webhook processed'], 200);
     }else{
         $data = $request->input('data');
 
-        if(! $data -> isEmpty()){
+        if (!empty($data)) {
 
             Log::info('PureSMS Webhook:', [
                 'MessageId'   => $data['MessageId'] ?? null,
