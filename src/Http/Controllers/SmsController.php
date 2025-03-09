@@ -6,6 +6,9 @@ use Illuminate\Routing\Controller;  // Laravel's base controller
 use Illuminate\Http\Request;
 use Puresms\Laravel\PureSmsService;  // Correct import for your service
 
+
+
+
 class SmsController extends Controller
 {
     protected $smsService;
@@ -13,6 +16,12 @@ class SmsController extends Controller
     public function __construct(PureSmsService $smsService)
     {
         $this->smsService = $smsService;
+    }
+
+
+    public function index()
+    {
+        return \Puresms\Laravel\Models\SmsLog::with("recipient")->get();
     }
 
     /**
