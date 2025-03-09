@@ -174,6 +174,8 @@ class PureSmsService
      */
     public function handleWebhook(Request $request)
     {
+
+        Log::error($request);
         $data = $request->input('data');
 
         Log::info('PureSMS Webhook:', [
