@@ -15,32 +15,14 @@ class PureSmsChannel
      */
     public function send($notifiable, Notification $notification)
     {
-
-        // $message = $notification->toSms($notifiable);
-
-
-        $recipient = $notifiable->sms_number ?? null;
+        // Get the phone number (for sending) and also the model ID for logging
+        $recipientPhone = $notifiable->sms_number ?? null;
+        $recipientId = $notifiable->id; // assuming the notifiable model has an id attribute
 
         // Get the message content from the notification
         $message = $notification->toSms($notifiable);
 
-        // Ensure we have a recipient and a message
-        // if (!$recipient || !$message) {
-        //     throw new \Exception("Recipient or message is missing for SMS notification.");
-        // }
-
-        // Send SMS using the PureSms package
-        $response = PureSms::sendSms($recipient, $message);
-
-        // Store the message in the database
-        // SmsLog::create([
-        //     'message_id' => $response['id'] ?? null,
-        //     'recipient'  => $recipient,
-        //     'sender'     => config('puresms.sender_name', 'ConnectTest'),
-        //     'content'    => $message,
-        //     'status'     => 'pending', // Default status
-        //     'error_code' => $response['error_code'] ?? null,
-        //     'processed_at' => now(),
-        // ]);
+        // Send SMS using the PureSms package, passing recipient id as a new parameter
+        $response = PureSms::sendSms($recipientPhone, $message, null, $recipientId);
     }
 }

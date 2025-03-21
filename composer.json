@@ -8,6 +8,7 @@
         "Puresms\\Laravel\\": "src/",
         "Puresms\\Laravel\\Channels\\": "src/Channels/",
         "Puresms\\Laravel\\Models\\": "src/Models/"
+        
     }
 },
 

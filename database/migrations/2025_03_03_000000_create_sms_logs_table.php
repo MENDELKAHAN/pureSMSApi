@@ -12,10 +12,10 @@ return new class extends Migration {
             $table->string('message_id')->unique();
            
 
-            // $table->string('recipient');
-            // $table->string('sender')->nullable();
+            $table->string('recipient')->nullable();
+            $table->string('sender')->nullable();
 
-            $table->unsignedBigInteger('recipient_id');
+            $table->unsignedBigInteger('recipient_id')->nullable();
             $table->unsignedBigInteger('sender_id')->nullable();
 
 
