@@ -343,12 +343,12 @@ protected function handleInboundSms(Request $request)
     // (Optional) If you want to look up which user corresponds to the `sender` phone,
     // you can do so here and fill in `sender_id` or `recipient_id`.
     // For example:
-    /*
-    if ($user = \App\Models\User::where('phone_number', $sender)->first()) {
+  
+     if ($user = \App\Models\User::where('sms_number', $sender)->first()) {
         $smsLog->sender_id = $user->id;
         $smsLog->save();
     }
-    */
+    
 
     return response()->json(['message' => 'Inbound SMS processed'], 200);
 }
