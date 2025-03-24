@@ -260,6 +260,13 @@ class PureSmsService
             'receivedAt'    => $receivedAtFormatted,
         ]);
 
+        if ($user = \App\Models\User::where('sms_number', $sender)->first()) {
+            $sender_id = $user->id;
+           
+        }else{
+              $sender_id = null;
+        }
+
         // Store in the same "sms_logs" table
         $smsLog = SmsLog::create([
             'message_id'   => $messageId,
@@ -278,16 +285,12 @@ class PureSmsService
             // If you’re not using error_code for inbound,
             // you can safely leave it null or omit it.
             'error_code'   => null,
+            'sender_id' => $sender_id ,
         ]);
 
-        // (Optional) If you want to look up which user corresponds to the `sender` phone,
-        // you can do so here and fill in `sender_id` or `recipient_id`.
-        // For example:
+     
        
-        if ($user = \App\Models\User::where('sms_number', $sender)->first()) {
-            $smsLog->sender_id = $user->id;
-            $smsLog->save();
-        }
+        
         
 
         return response()->json(['message' => 'Inbound SMS processed'], 200);
