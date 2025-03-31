@@ -25,6 +25,7 @@ class PureSmsService
      */
     public function sendSms($to, $message, $from = null, $recipientId = null, $senderId = null)
     {
+
         $payload = [
             'sender'    => $from ?? env('PURESMS_SENDER', 'ConnectTest'),
             'recipient' => $to,
@@ -200,6 +201,7 @@ class PureSmsService
 
     private function handleDeliveryConfirmation(Request $request)
     {
+        $data = $request -> data;
         Log::info('PureSMS Webhook:', [
                 'MessageId'   => $data['MessageId'] ?? null,
                 'Status'      => $data['DeliveryStatus'] ?? null,
@@ -270,11 +272,15 @@ class PureSmsService
             'receivedAt'    => $receivedAtFormatted,
         ]);
 
-        if ($user = \App\Models\User::where('sms_number', $sender)->first()) {
+        $user = \App\Models\User::where(function ($query) use ($sender) {
+            $query->where('sms_number', $sender)
+                  ->orWhere('sms_number', '+' . $sender);
+        })->first();
+
+        if ($user) {
             $sender_id = $user->id;
-           
-        }else{
-              $sender_id = null;
+        } else {
+            $sender_id = null;
         }
 
         // Store in the same "sms_logs" table
