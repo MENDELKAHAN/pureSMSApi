@@ -163,30 +163,19 @@ class PureSmsService
         }
     }
 
-
-
     public function handleWebhook(Request $request)
-    {
+    {   
 
-
-        // 1. (Optional) Validate the webhook signature if the provider sends an X-Webhook-Signature or X-Webhook-Timestamp
         // $this->validateWebhookSignature($request);
 
-        // 2. Check if this payload looks like an inbound message
-        //    (i.e. it has 'messageId', 'inboundNumber', 'sender', 'body', 'receivedAt')
-        if (
-            $request->has('messageId') &&
-            $request->has('inboundNumber') &&
-            $request->has('sender') &&
-            $request->has('body') &&
-            $request->has('receivedAt')
-        ) {
-            return $this->handleInboundSms($request);
-        }
-        
-        // 3. Otherwise, fall back to your existing delivery-status logic
-        //    (the “status update” that uses 'data.MessageId' etc).
+        // 1 = delivery conformation
+        // 2 = sms recived
+        $type = $request -> event_type;
         $data = $request->input('data');
+        
+
+
+      
 
         if (empty($data)) {
             // No data for a delivery report nor inbound SMS
@@ -194,22 +183,38 @@ class PureSmsService
             return response()->json(['message' => 'Webhook processed, but no recognized content'], 200);
         }
 
-        // If we get here, we assume it’s a status update. Proceed as you do now:
-        Log::info('PureSMS Webhook:', [
-            'MessageId'   => $data['MessageId'] ?? null,
-            'Status'      => $data['DeliveryStatus'] ?? null,
-            'ErrorCode'   => $data['ErrorCode'] ?? null,
-            'ProcessedAt' => $data['ProcessedAt'] ?? null,
-            'DeliveredAt' => $data['DeliveredAt'] ?? null,
-        ]);
+         
 
-        // Convert ISO8601 timestamps
-        $processedAt = isset($data['ProcessedAt'])
-            ? (new \DateTime($data['ProcessedAt']))->format('Y-m-d H:i:s')
-            : null;
-        $deliveredAt = isset($data['DeliveredAt'])
-            ? (new \DateTime($data['DeliveredAt']))->format('Y-m-d H:i:s')
-            : null;
+
+        if ($type === 2) {
+            
+            return $this->handleInboundSms($request);
+        }else if($type === 1){
+            return $this->handleInboundSms($request);
+        }else{
+            Log::error('unknown webhook');
+            Log::error($request);
+            return response()->json(['message' => 'Unknown Type'], 200);
+        }        
+    }
+
+    private function handleDeliveryConfirmation(Request $request)
+    {
+        Log::info('PureSMS Webhook:', [
+                'MessageId'   => $data['MessageId'] ?? null,
+                'Status'      => $data['DeliveryStatus'] ?? null,
+                'ErrorCode'   => $data['ErrorCode'] ?? null,
+                'ProcessedAt' => $data['ProcessedAt'] ?? null,
+                'DeliveredAt' => $data['DeliveredAt'] ?? null,
+            ]);
+
+            // Convert ISO8601 timestamps
+            $processedAt = isset($data['ProcessedAt'])
+                ? (new \DateTime($data['ProcessedAt']))->format('Y-m-d H:i:s')
+                : null;
+            $deliveredAt = isset($data['DeliveredAt'])
+                ? (new \DateTime($data['DeliveredAt']))->format('Y-m-d H:i:s')
+                : null;
 
         // Update delivery status in your DB
         SmsLog::where('message_id', $data['MessageId'])
@@ -233,15 +238,20 @@ class PureSmsService
      */
     protected function handleInboundSms(Request $request)
     {
-        $messageId     = $request->input('messageId');
-        $inboundNumber = $request->input('inboundNumber'); // The number on *your* side (the "recipient" in your system)
-        $sender        = $request->input('sender');        // The phone number that sent the SMS
-        $body          = $request->input('body');
-        $receivedAt    = $request->input('receivedAt');
+        $data = $request -> data;
+
+
+
+        // return response()->json(['message' => 'Delivery status processed'], 200);
+
+        $messageId     = $data['MessageId'];
+        $inboundNumber = $data['InboundNumber']; // The number on *your* side (the "recipient" in your system)
+        $sender        = $data['Sender'];        // The phone number that sent the SMS
+        $body          = $data['Body'];
+        $receivedAt    = $data['ReceivedAt'];
 
         try {
         $dt = new \DateTime($receivedAt);
-    // MySQL DATETIME minimum valid value is '1000-01-01 00:00:00'
         if ($dt->format('Y') < 1000) {
             $receivedAtFormatted = null;
         } else {
@@ -296,7 +306,6 @@ class PureSmsService
         return response()->json(['message' => 'Inbound SMS processed'], 200);
     }
 
-
     /**
      * (Optional) Example of verifying the webhook signature if your provider includes it.
      * Adjust the code for your provider's exact signing algorithm.
@@ -319,9 +328,6 @@ class PureSmsService
             abort(403, 'Invalid webhook signature');
         }
     }
-
-
-
 
     /**
      * Map PureSMS Delivery Status codes to readable statuses.
