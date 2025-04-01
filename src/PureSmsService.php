@@ -47,8 +47,12 @@ class PureSmsService
                 return false;
             }
 
+
+
             // Get response data
             $responseData = $response->json();
+
+
 
             // Determine status
             $status = $response->successful() && isset($responseData['id']) ? 'sent' : 'failed';
@@ -166,6 +170,9 @@ class PureSmsService
     public function handleWebhook(Request $request)
     {   
 
+
+
+      
         // $this->validateWebhookSignature($request);
 
         // 1 = delivery conformation
@@ -174,8 +181,6 @@ class PureSmsService
         $data = $request->input('data');
         
 
-
-      
 
         if (empty($data)) {
             // No data for a delivery report nor inbound SMS
@@ -282,30 +287,36 @@ class PureSmsService
         }
 
         // Store in the same "sms_logs" table
-        $smsLog = SmsLog::create([
-            'message_id'   => $messageId,
-            // "recipient" is the inbound number on your side
-            'recipient'    => $inboundNumber, 
-            // "sender" is the phone who sent the SMS
-            'sender'       => $sender,       
-            // The SMS body goes into "content"
-            'content'      => $body,         
-            // You can mark inbound messages with a custom status
-            'status'       => 'received',    
-            'processed_at' => $receivedAtFormatted,
-            // For inbound, you may not need delivered_at, 
-            // but you could set it if you want:
-            'delivered_at' => $receivedAtFormatted,
-            // If you’re not using error_code for inbound,
-            // you can safely leave it null or omit it.
-            'error_code'   => null,
-            'sender_id' => $sender_id ,
-        ]);
+        // $smsLog = SmsLog::create([
+        //     'message_id'   => $messageId,
+        //     'recipient'    => $inboundNumber, 
+        //     'sender'       => $sender,       
+        //     'content'      => $body,         
+        //     'status'       => 'received',    
+        //     'processed_at' => $receivedAtFormatted,
+        //     'delivered_at' => $receivedAtFormatted,
+        //     'error_code'   => null,
+        //     'sender_id' => $sender_id ,
+        // ]);
 
-     
-       
-        
-        
+        $smsLog = SmsLog::firstOrCreate(
+            // Search array (unique fields to check)
+            ['message_id' => $messageId],  
+            
+            // Attributes to set if no record is found
+            [
+                'recipient'    => $inboundNumber,
+                'sender'       => $sender,
+                'content'      => $body,
+                'status'       => 'received',
+                'processed_at' => $receivedAtFormatted,
+                'delivered_at' => $receivedAtFormatted,
+                'error_code'   => null,
+                'sender_id'    => $sender_id,
+            ]
+        );
+
+
 
         return response()->json(['message' => 'Inbound SMS processed'], 200);
     }
