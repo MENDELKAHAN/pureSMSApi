@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
-
 class PureSmsService
 {
     protected $apiKey;
@@ -191,7 +190,7 @@ class PureSmsService
             
             return $this->handleInboundSms($request);
         }else if($type === 1){
-            return $this->handleInboundSms($request);
+            return $this->handleDeliveryConfirmation($request);
         }else{
             Log::error('unknown webhook');
             Log::error($request);
@@ -241,7 +240,6 @@ class PureSmsService
     protected function handleInboundSms(Request $request)
     {
         $data = $request -> data;
-
 
 
         // return response()->json(['message' => 'Delivery status processed'], 200);
