@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('sms_logs', function (Blueprint $table) {
             $table->id();
-            $table->string('message_id')->unique();
+            $table->string('message_id')->nullable()->unique();
            
 
             $table->string('recipient')->nullable();
@@ -17,7 +17,6 @@ return new class extends Migration {
 
             $table->unsignedBigInteger('recipient_id')->nullable();
             $table->unsignedBigInteger('sender_id')->nullable();
-
 
             $table->text('content');
             $table->string('status')->default('pending');
