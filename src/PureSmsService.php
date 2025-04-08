@@ -204,7 +204,7 @@ class PureSmsService
     public function handleWebhook(Request $request)
     {
 
-        Log::info('Webhook received', [
+        Log::error('Webhook received', [
             'headers' => $request->headers->all(),
             'body'    => $request->all(),
         ]);
