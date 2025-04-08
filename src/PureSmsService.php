@@ -204,21 +204,23 @@ class PureSmsService
     public function handleWebhook(Request $request)
     {
         $payload = $request->all();
+
         // If 'data' exists, unwrap it
-        if (isset($payload['data'])) {
-            foreach ($payload['data'] as $key => $value) {
-                $request->merge([$key => $value]);
-            }
-        }
+        // if (isset($payload['data'])) {
+        //     foreach ($payload['data'] as $key => $value) {
+        //         $request->merge([$key => $value]);
+        //     }
+        // }
        
     
-        if (
-            $request->has('messageId') &&
-            $request->has('inboundNumber') &&
-            $request->has('sender') &&
-            $request->has('body') &&
-            $request->has('receivedAt')
+        if ($request -> event_type === 2
+            // $request->has('messageId') &&
+            // $request->has('inboundNumber') &&
+            // $request->has('sender') &&
+            // $request->has('body') &&
+            // $request->has('receivedAt')
         ) {
+
             return $this->handleInboundSms($request);
         }
             
@@ -271,16 +273,18 @@ class PureSmsService
      */
     protected function handleInboundSms(Request $request)
     {
+        $data = array_change_key_case($request -> data, CASE_LOWER);
 
-        $messageId     = $request->input('messageId');
-        $inboundNumber = $request->input('inboundNumber'); // The number on *your* side (the "recipient" in your system)
-        $sender        = $request->input('sender');        // The phone number that sent the SMS
-        $body          = $request->input('body');
-        $receivedAt    = $request->input('receivedAt');
+
+        $messageId     = $data['messageid'];
+        $inboundNumber = $data['inboundnumber']; // The number on *your* side (the "recipient" in your system)
+        $sender        = $data['sender'];        // The phone number that sent the SMS
+        $body          = $data['body'];
+        $receivedAt    = $data['receivedat'];
 
         try {
         $dt = new \DateTime($receivedAt);
-    // MySQL DATETIME minimum valid value is '1000-01-01 00:00:00'
+        // MySQL DATETIME minimum valid value is '1000-01-01 00:00:00'
         if ($dt->format('Y') < 1000) {
             $receivedAtFormatted = null;
         } else {
