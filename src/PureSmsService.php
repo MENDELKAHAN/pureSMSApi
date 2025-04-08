@@ -204,6 +204,10 @@ class PureSmsService
     public function handleWebhook(Request $request)
     {
 
+        Log::info('Webhook received', [
+            'headers' => $request->headers->all(),
+            'body'    => $request->all(),
+        ]);
 
         // 1. (Optional) Validate the webhook signature if the provider sends an X-Webhook-Signature or X-Webhook-Timestamp
         // $this->validateWebhookSignature($request);
@@ -271,6 +275,10 @@ class PureSmsService
      */
     protected function handleInboundSms(Request $request)
     {
+
+        
+
+
         $messageId     = $request->input('messageId');
         $inboundNumber = $request->input('inboundNumber'); // The number on *your* side (the "recipient" in your system)
         $sender        = $request->input('sender');        // The phone number that sent the SMS
