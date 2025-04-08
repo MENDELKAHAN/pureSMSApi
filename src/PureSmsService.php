@@ -223,40 +223,42 @@ class PureSmsService
         // 3. Otherwise, fall back to your existing delivery-status logic
         //    (the “status update” that uses 'data.MessageId' etc).
         $data = $request->input('data');
+        $data = $request->input('data');
 
         if (empty($data)) {
-            // No data for a delivery report nor inbound SMS
             Log::error('Webhook: no data or unrecognized payload');
             return response()->json(['message' => 'Webhook processed, but no recognized content'], 200);
         }
 
-        // If we get here, we assume it’s a status update. Proceed as you do now:
+        // 🔽 Normalize keys to lowercase
+        $data = array_change_key_case($data, CASE_LOWER);
+
         Log::info('PureSMS Webhook:', [
-            'MessageId'   => $data['MessageId'] ?? null,
-            'Status'      => $data['DeliveryStatus'] ?? null,
-            'ErrorCode'   => $data['ErrorCode'] ?? null,
-            'ProcessedAt' => $data['ProcessedAt'] ?? null,
-            'DeliveredAt' => $data['DeliveredAt'] ?? null,
+            'MessageId'   => $data['messageid'] ?? null,
+            'Status'      => $data['deliverystatus'] ?? null,
+            'ErrorCode'   => $data['errorcode'] ?? null,
+            'ProcessedAt' => $data['processedat'] ?? null,
+            'DeliveredAt' => $data['deliveredat'] ?? null,
         ]);
 
-        // Convert ISO8601 timestamps
-        $processedAt = isset($data['ProcessedAt'])
-            ? (new \DateTime($data['ProcessedAt']))->format('Y-m-d H:i:s')
-            : null;
-        $deliveredAt = isset($data['DeliveredAt'])
-            ? (new \DateTime($data['DeliveredAt']))->format('Y-m-d H:i:s')
+        $processedAt = isset($data['processedat'])
+            ? (new \DateTime($data['processedat']))->format('Y-m-d H:i:s')
             : null;
 
-        // Update delivery status in your DB
-        SmsLog::where('message_id', $data['MessageId'])
+        $deliveredAt = isset($data['deliveredat'])
+            ? (new \DateTime($data['deliveredat']))->format('Y-m-d H:i:s')
+            : null;
+
+        SmsLog::where('message_id', $data['messageid'] ?? null)
             ->update([
-                'status'       => $this->mapDeliveryStatus($data['DeliveryStatus']),
-                'error_code'   => $data['ErrorCode'] ?? null,
+                'status'       => $this->mapDeliveryStatus($data['deliverystatus'] ?? null),
+                'error_code'   => $data['errorcode'] ?? null,
                 'processed_at' => $processedAt,
                 'delivered_at' => $deliveredAt,
             ]);
 
         return response()->json(['message' => 'Delivery status processed'], 200);
+
     }
 
     /**
