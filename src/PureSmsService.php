@@ -23,108 +23,108 @@ class PureSmsService
     /**
      * Send an SMS and store it in the database.
      */
-   public function sendSms($to, $message, $from = null, $recipientId = null, $senderId = null)
-{
-    $payload = [
-        'sender'    => $from ?? env('PURESMS_SENDER', 'ConnectTest'),
-        'recipient' => $to,
-        'content'   => $message,
-    ];
+    public function sendSms($to, $message, $from = null, $recipientId = null, $senderId = null)
+    {
+        $payload = [
+            'sender'    => $from ?? env('PURESMS_SENDER', 'ConnectTest'),
+            'recipient' => $to,
+            'content'   => $message,
+        ];
 
-    $jsonPayload = json_encode($payload);
+        $jsonPayload = json_encode($payload);
 
-    try {
-        $response = Http::withHeaders([
-            'Content-Type'   => 'application/json',
-            'Content-Length' => strlen($jsonPayload),
-            'X-API-Key'      => $this->apiKey,
-        ])->post("{$this->endpoint}/sms/send", $payload);
+        try {
+            $response = Http::withHeaders([
+                'Content-Type'   => 'application/json',
+                'Content-Length' => strlen($jsonPayload),
+                'X-API-Key'      => $this->apiKey,
+            ])->post("{$this->endpoint}/sms/send", $payload);
 
-        if ($response->failed()) {
-            // Log failure and message being sent
-            Log::error('PureSMS API request failed', [
-                'status'     => $response->status(),
-                'body'       => $response->body(),
+            if ($response->failed()) {
+                // Log failure and message being sent
+                Log::error('PureSMS API request failed', [
+                    'status'     => $response->status(),
+                    'body'       => $response->body(),
+                    'headers'    => $response->headers(),
+                    'to'         => $to,
+                    'from'       => $from,
+                    'message'    => $message,
+                    'recipient_id' => $recipientId,
+                    'sender_id'    => $senderId,
+                ]);
+
+                // Optionally log to DB even on failure
+                SmsLog::create([
+                    'message_id'   => null,
+                    'recipient_id' => $recipientId,
+                    'sender_id'    => $senderId,
+                    'content'      => $message,
+                    'status'       => 'failed',
+                    'error_code'   => $response->status(),
+                    'processed_at' => now(),
+                ]);
+
+                return [
+                    'error'   => true,
+                    'message' => 'API call failed',
+                    'status'  => $response->status(),
+                ];
+            }
+
+            $responseData = $response->json();
+            $status = isset($responseData['id']) ? 'sent' : 'failed';
+            $messageId = $responseData['id'] ?? null;
+
+            SmsLog::create([
+                'message_id'   => $messageId,
+                'recipient_id' => $recipientId,
+                'sender_id'    => $senderId,
+                'content'      => $message,
+                'status'       => $status,
+                'error_code'   => $status === 'sent' ? null : $response->status(),
+                'processed_at' => now(),
+            ]);
+
+            Log::info('PureSMS API successful response', [
+                'status'  => $response->status(),
+                'body'    => $response->body(),
+                'headers' => $response->headers(),
+            ]);
+
+            return [
+                'status'     => $status,
+                'message_id' => $messageId,
+                'body'       => $responseData,
                 'headers'    => $response->headers(),
-                'to'         => $to,
-                'from'       => $from,
-                'message'    => $message,
+            ];
+        } catch (\Exception $e) {
+            // Log exception with payload details
+            Log::error('PureSMS API exception thrown', [
+                'error'        => $e->getMessage(),
+                'to'           => $to,
+                'from'         => $from,
+                'message'      => $message,
                 'recipient_id' => $recipientId,
                 'sender_id'    => $senderId,
             ]);
 
-            // Optionally log to DB even on failure
+            // Optionally log to DB on exception
             SmsLog::create([
                 'message_id'   => null,
                 'recipient_id' => $recipientId,
                 'sender_id'    => $senderId,
                 'content'      => $message,
                 'status'       => 'failed',
-                'error_code'   => $response->status(),
+                'error_code'   => 'exception',
                 'processed_at' => now(),
             ]);
 
             return [
                 'error'   => true,
-                'message' => 'API call failed',
-                'status'  => $response->status(),
+                'message' => $e->getMessage(),
             ];
         }
-
-        $responseData = $response->json();
-        $status = isset($responseData['id']) ? 'sent' : 'failed';
-        $messageId = $responseData['id'] ?? null;
-
-        SmsLog::create([
-            'message_id'   => $messageId,
-            'recipient_id' => $recipientId,
-            'sender_id'    => $senderId,
-            'content'      => $message,
-            'status'       => $status,
-            'error_code'   => $status === 'sent' ? null : $response->status(),
-            'processed_at' => now(),
-        ]);
-
-        Log::info('PureSMS API successful response', [
-            'status'  => $response->status(),
-            'body'    => $response->body(),
-            'headers' => $response->headers(),
-        ]);
-
-        return [
-            'status'     => $status,
-            'message_id' => $messageId,
-            'body'       => $responseData,
-            'headers'    => $response->headers(),
-        ];
-    } catch (\Exception $e) {
-        // Log exception with payload details
-        Log::error('PureSMS API exception thrown', [
-            'error'        => $e->getMessage(),
-            'to'           => $to,
-            'from'         => $from,
-            'message'      => $message,
-            'recipient_id' => $recipientId,
-            'sender_id'    => $senderId,
-        ]);
-
-        // Optionally log to DB on exception
-        SmsLog::create([
-            'message_id'   => null,
-            'recipient_id' => $recipientId,
-            'sender_id'    => $senderId,
-            'content'      => $message,
-            'status'       => 'failed',
-            'error_code'   => 'exception',
-            'processed_at' => now(),
-        ]);
-
-        return [
-            'error'   => true,
-            'message' => $e->getMessage(),
-        ];
     }
-}
 
     public function sendSmsBatch(array $messages, ?string $sendAtUtc = null)
     {
@@ -203,17 +203,15 @@ class PureSmsService
 
     public function handleWebhook(Request $request)
     {
-
-        Log::error('Webhook received', [
-            'headers' => $request->headers->all(),
-            'body'    => $request->all(),
-        ]);
-
-        // 1. (Optional) Validate the webhook signature if the provider sends an X-Webhook-Signature or X-Webhook-Timestamp
-        // $this->validateWebhookSignature($request);
-
-        // 2. Check if this payload looks like an inbound message
-        //    (i.e. it has 'messageId', 'inboundNumber', 'sender', 'body', 'receivedAt')
+        $payload = $request->all();
+        // If 'data' exists, unwrap it
+        if (isset($payload['data'])) {
+            foreach ($payload['data'] as $key => $value) {
+                $request->merge([$key => $value]);
+            }
+        }
+       
+    
         if (
             $request->has('messageId') &&
             $request->has('inboundNumber') &&
@@ -223,19 +221,17 @@ class PureSmsService
         ) {
             return $this->handleInboundSms($request);
         }
-        
+            
         // 3. Otherwise, fall back to your existing delivery-status logic
         //    (the “status update” that uses 'data.MessageId' etc).
         $data = $request->input('data');
-        $data = $request->input('data');
+        $data = array_change_key_case($data, CASE_LOWER);
 
         if (empty($data)) {
             Log::error('Webhook: no data or unrecognized payload');
             return response()->json(['message' => 'Webhook processed, but no recognized content'], 200);
         }
-
-        // 🔽 Normalize keys to lowercase
-        $data = array_change_key_case($data, CASE_LOWER);
+    
 
         Log::info('PureSMS Webhook:', [
             'MessageId'   => $data['messageid'] ?? null,
@@ -275,9 +271,6 @@ class PureSmsService
      */
     protected function handleInboundSms(Request $request)
     {
-
-        
-
 
         $messageId     = $request->input('messageId');
         $inboundNumber = $request->input('inboundNumber'); // The number on *your* side (the "recipient" in your system)
