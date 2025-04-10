@@ -75,8 +75,6 @@ class PureSmsService
             $status = isset($responseData['id']) ? 'sent' : 'failed';
             $messageId = $responseData['id'] ?? null;
 
-            try {
-
             SmsLog::create([
                 'message_id'   => $messageId,
                 'recipient_id' => $recipientId,
@@ -86,18 +84,6 @@ class PureSmsService
                 'error_code'   => $status === 'sent' ? null : $response->status(),
                 'processed_at' => now(),
             ]);
-
-            }} catch (\Illuminate\Database\QueryException $e) {
-                Log::warning('Duplicate SMS log prevented:', [
-                    'error'      => $e->getMessage(),
-                    'message_id' => $messageId,
-                ]);
-
-                return response()->json(['message' => 'Duplicate entry ignored'], 200);
-            }
-
-
-
 
             Log::info('PureSMS API successful response', [
                 'status'  => $response->status(),
@@ -325,8 +311,7 @@ class PureSmsService
         }
 
 
-
-        try {
+        try{
         // Store in the same "sms_logs" table
         $smsLog = SmsLog::create([
             'message_id'   => $messageId,
@@ -349,13 +334,13 @@ class PureSmsService
         ]);
 
         } catch (\Illuminate\Database\QueryException $e) {
-            Log::warning('Duplicate SMS log prevented:', [
-                'error'      => $e->getMessage(),
-                'message_id' => $messageId,
-            ]);
+    Log::warning('Duplicate SMS log prevented:', [
+        'error'      => $e->getMessage(),
+        'message_id' => $messageId,
+    ]);
 
-            return response()->json(['message' => 'Duplicate entry ignored'], 200);
-        }
+    return response()->json(['message' => 'Duplicate entry ignored'], 200);
+}
 
      
        
@@ -405,3 +390,5 @@ class PureSmsService
         };
     }
 }
+
+
