@@ -9,7 +9,7 @@ class SmsLog extends Model
         'message_id', 'recipient', 'sender', 'recipient_id', 'sender_id', 'content', 'status', 'error_code', 'processed_at', 'delivered_at'
     ];
 
-    public function sender()
+    public function senderUser()
     {
         return $this->belongsTo(\App\Models\User::class, 'sender_id');
     }
