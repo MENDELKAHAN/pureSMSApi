@@ -14,6 +14,11 @@ class SmsLog extends Model
         return $this->belongsTo(\App\Models\User::class, 'sender_id');
     }
 
+    public function recipientUser()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'recipient_id');
+    }
+
     public function recipient()
     {
         return $this->belongsTo(\App\Models\User::class, 'recipient_id');
