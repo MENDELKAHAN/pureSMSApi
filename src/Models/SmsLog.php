@@ -11,11 +11,11 @@ class SmsLog extends Model
 
     public function senderUser()
     {
-        return $this->belongsTo(\App\Models\User::class, 'sender_id');
+        return $this->belongsTo(config('puresms.number_model', \App\Models\User::class), 'sender_id');
     }
 
     public function recipient()
     {
-        return $this->belongsTo(\App\Models\User::class, 'recipient_id');
+        return $this->belongsTo(config('puresms.number_model', \App\Models\User::class), 'recipient_id');
     }
 }

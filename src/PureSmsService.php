@@ -8,16 +8,19 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
-
 class PureSmsService
 {
     protected $apiKey;
     protected $endpoint;
+    protected $numberModel;
+    protected $mobileNumber;
 
     public function __construct()
     {
         $this->apiKey = config('puresms.api_key');
         $this->endpoint = config('puresms.endpoint');
+        $this->numberModel = config('puresms.number_model', \App\Models\User::class);
+        $this->mobileNumber = config('puresms.mobile_number', 'sms_number');
     }
 
     /**
@@ -41,7 +44,6 @@ class PureSmsService
             ])->post("{$this->endpoint}/sms/send", $payload);
 
             if ($response->failed()) {
-                // Log failure and message being sent
                 Log::error('PureSMS API request failed', [
                     'status'     => $response->status(),
                     'body'       => $response->body(),
@@ -53,7 +55,6 @@ class PureSmsService
                     'sender_id'    => $senderId,
                 ]);
 
-                // Optionally log to DB even on failure
                 SmsLog::create([
                     'message_id'   => null,
                     'recipient_id' => $recipientId,
@@ -98,7 +99,6 @@ class PureSmsService
                 'headers'    => $response->headers(),
             ];
         } catch (\Exception $e) {
-            // Log exception with payload details
             Log::error('PureSMS API exception thrown', [
                 'error'        => $e->getMessage(),
                 'to'           => $to,
@@ -108,7 +108,6 @@ class PureSmsService
                 'sender_id'    => $senderId,
             ]);
 
-            // Optionally log to DB on exception
             SmsLog::create([
                 'message_id'   => null,
                 'recipient_id' => $recipientId,
@@ -128,7 +127,6 @@ class PureSmsService
 
     public function sendSmsBatch(array $messages, ?string $sendAtUtc = null)
     {
-        // Ensure messages array is properly structured
         $payload = [
             'messages' => array_map(function ($message) {
                 return [
@@ -139,26 +137,21 @@ class PureSmsService
             }, $messages)
         ];
 
-        // Include scheduled time if provided
         if ($sendAtUtc) {
             $payload['sendAtUtc'] = $sendAtUtc;
         }
 
-        // Convert payload to JSON
         $jsonPayload = json_encode($payload);
 
         try {
-            // Make API request
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
                 'Content-Length' => strlen($jsonPayload),
                 'X-API-Key' => $this->apiKey,
             ])->post("{$this->endpoint}/sms/send/bulk", $payload);
 
-            // Get response data
             $responseData = $response->json();
 
-            // Log batch messages in the database
             foreach ($messages as $message) {
                 SmsLog::create([
                     'batch_id' => $responseData['batchId'] ?? null,
@@ -171,7 +164,6 @@ class PureSmsService
                 ]);
             }
 
-            // Log API response
             Log::info('PureSMS Bulk API Response:', [
                 'status' => $response->status(),
                 'batch_id' => $responseData['batchId'] ?? null,
@@ -187,9 +179,7 @@ class PureSmsService
                 'body' => $responseData,
                 'headers' => $response->headers()
             ];
-
         } catch (\Exception $e) {
-            // Log errors
             Log::error('PureSMS Bulk API Error:', ['message' => $e->getMessage()]);
 
             return [
@@ -199,33 +189,14 @@ class PureSmsService
         }
     }
 
-
-
     public function handleWebhook(Request $request)
     {
         $payload = $request->all();
 
-        // If 'data' exists, unwrap it
-        // if (isset($payload['data'])) {
-        //     foreach ($payload['data'] as $key => $value) {
-        //         $request->merge([$key => $value]);
-        //     }
-        // }
-       
-    
-        if ($request -> event_type === 2
-            // $request->has('messageId') &&
-            // $request->has('inboundNumber') &&
-            // $request->has('sender') &&
-            // $request->has('body') &&
-            // $request->has('receivedAt')
-        ) {
-
+        if ($request->event_type === 2) {
             return $this->handleInboundSms($request);
         }
-            
-        // 3. Otherwise, fall back to your existing delivery-status logic
-        //    (the “status update” that uses 'data.MessageId' etc).
+
         $data = $request->input('data');
         $data = array_change_key_case($data, CASE_LOWER);
 
@@ -233,7 +204,6 @@ class PureSmsService
             Log::error('Webhook: no data or unrecognized payload');
             return response()->json(['message' => 'Webhook processed, but no recognized content'], 200);
         }
-    
 
         Log::info('PureSMS Webhook:', [
             'MessageId'   => $data['messageid'] ?? null,
@@ -260,38 +230,27 @@ class PureSmsService
             ]);
 
         return response()->json(['message' => 'Delivery status processed'], 200);
-
     }
 
-    /**
-     * Example method to handle the inbound SMS scenario.
-     */
-    /**
-     * Example method to handle the inbound SMS scenario.
-     * In this version, we store the inbound data
-     * into the existing "sms_logs" table via SmsLog model.
-     */
     protected function handleInboundSms(Request $request)
     {
-        $data = array_change_key_case($request -> data, CASE_LOWER);
-
+        $data = array_change_key_case($request->data, CASE_LOWER);
 
         $messageId     = $data['messageid'];
-        $inboundNumber = $data['inboundnumber']; // The number on *your* side (the "recipient" in your system)
-        $sender        = $data['sender'];        // The phone number that sent the SMS
+        $inboundNumber = $data['inboundnumber'];
+        $sender        = $data['sender'];
         $body          = $data['body'];
         $receivedAt    = $data['receivedat'];
 
         try {
-        $dt = new \DateTime($receivedAt);
-        // MySQL DATETIME minimum valid value is '1000-01-01 00:00:00'
-        if ($dt->format('Y') < 1000) {
-            $receivedAtFormatted = null;
-        } else {
-            $receivedAtFormatted = $dt->format('Y-m-d H:i:s');
-        }
+            $dt = new \DateTime($receivedAt);
+            if ($dt->format('Y') < 1000) {
+                $receivedAtFormatted = null;
+            } else {
+                $receivedAtFormatted = $dt->format('Y-m-d H:i:s');
+            }
         } catch (\Exception $e) {
-            $receivedAtFormatted = null; // fallback if there's a parsing error
+            $receivedAtFormatted = null;
             Log::error('Invalid receivedAt timestamp: ' . $receivedAt);
         }
 
@@ -303,67 +262,40 @@ class PureSmsService
             'receivedAt'    => $receivedAtFormatted,
         ]);
 
-        if ($user = \App\Models\User::where('sms_number', $sender)->first()) {
-            $sender_id = $user->id;
-           
-        }else{
-              $sender_id = null;
-        }
+        $modelClass = $this->numberModel;
+        $sender_id = ($modelClass::where($this->mobileNumber, $sender)->first())?->id;
 
-
-        try{
-        // Store in the same "sms_logs" table
-        $smsLog = SmsLog::create([
-            'message_id'   => $messageId,
-            // "recipient" is the inbound number on your side
-            'recipient'    => $inboundNumber, 
-            // "sender" is the phone who sent the SMS
-            'sender'       => $sender,       
-            // The SMS body goes into "content"
-            'content'      => $body,         
-            // You can mark inbound messages with a custom status
-            'status'       => 'received',    
-            'processed_at' => $receivedAtFormatted,
-            // For inbound, you may not need delivered_at, 
-            // but you could set it if you want:
-            'delivered_at' => $receivedAtFormatted,
-            // If you’re not using error_code for inbound,
-            // you can safely leave it null or omit it.
-            'error_code'   => null,
-            'sender_id' => $sender_id ,
-        ]);
-
+        try {
+            $smsLog = SmsLog::create([
+                'message_id'   => $messageId,
+                'recipient'    => $inboundNumber,
+                'sender'       => $sender,
+                'content'      => $body,
+                'status'       => 'received',
+                'processed_at' => $receivedAtFormatted,
+                'delivered_at' => $receivedAtFormatted,
+                'error_code'   => null,
+                'sender_id'    => $sender_id,
+            ]);
         } catch (\Illuminate\Database\QueryException $e) {
-    Log::warning('Duplicate SMS log prevented:', [
-        'error'      => $e->getMessage(),
-        'message_id' => $messageId,
-    ]);
+            Log::warning('Duplicate SMS log prevented:', [
+                'error'      => $e->getMessage(),
+                'message_id' => $messageId,
+            ]);
 
-    return response()->json(['message' => 'Duplicate entry ignored'], 200);
-}
-
-     
-       
-        
-        
+            return response()->json(['message' => 'Duplicate entry ignored'], 200);
+        }
 
         return response()->json(['message' => 'Inbound SMS processed'], 200);
     }
 
-
-    /**
-     * (Optional) Example of verifying the webhook signature if your provider includes it.
-     * Adjust the code for your provider's exact signing algorithm.
-     */
     protected function validateWebhookSignature(Request $request)
     {
         $signature   = $request->header('X-Webhook-Signature');
         $timestamp   = $request->header('X-Webhook-Timestamp');
-        $secretKey   = config('services.puresms.webhook_secret'); // for example
+        $secretKey   = config('services.puresms.webhook_secret');
         $body        = $request->getContent();
 
-        // Possibly your provider wants something like
-        // HMAC-SHA256(timestamp + body, secretKey) == $signature
         $computedHmac = base64_encode(
             hash_hmac('sha256', $timestamp . $body, $secretKey, true)
         );
@@ -374,12 +306,6 @@ class PureSmsService
         }
     }
 
-
-
-
-    /**
-     * Map PureSMS Delivery Status codes to readable statuses.
-     */
     private function mapDeliveryStatus($status)
     {
         return match ($status) {
@@ -390,5 +316,3 @@ class PureSmsService
         };
     }
 }
-
-
