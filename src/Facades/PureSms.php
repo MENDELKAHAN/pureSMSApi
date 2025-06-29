@@ -1,11 +1,11 @@
 <?php
-namespace Puresms\Laravel\Channels;
+namespace Puresms\Laravel\Facades;
 
 use Illuminate\Notifications\Notification;
 use Puresms\Laravel\Facades\PureSms;
 use Puresms\Laravel\Models\SmsLog;
 
-class PureSmsChannel
+class PureSms
 {
     /**
      * Send the given notification.
