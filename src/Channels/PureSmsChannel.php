@@ -11,20 +11,18 @@ class PureSmsChannel
 {
     public function send($notifiable, Notification $notification)
     {
-        $phoneField = config('puresms.mobile_number', 'sms_number');
-        $recipientPhone = $notifiable->$phoneField ?? null;
+        // Get the phone number and model ID for logging
+        $recipientPhone = $notifiable->sms_number ?? null;
         $recipientId = $notifiable->id;
 
-        if (empty($recipientPhone)) {
-            Log::warning('PureSMS: Skipping notification due to missing phone number', [
-                'recipient_id' => $recipientId,
-                'phone_field' => $phoneField,
-            ]);
-            return;
-        }
+        // Get the message content and custom sender from the notification
+        $data = $notification->toSms($notifiable);
+        $message = $data['content'] ?? null;
+        $from = $data['from'] ?? null;
 
-        $message = $notification->toSms($notifiable);
-        $response = PureSms::sendSms($recipientPhone, $message, null, $recipientId);
+        $response = PureSms::sendSms($recipientPhone, $message, $from, $recipientId);
+
+        return $response;
     }
 }
 
