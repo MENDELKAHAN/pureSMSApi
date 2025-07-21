@@ -1,34 +1,5 @@
 <?php
 
-// namespace Puresms\Laravel\Channels;
-
-// use Illuminate\Notifications\Notification;
-// use Puresms\Laravel\Facades\PureSms;
-// use Puresms\Laravel\Models\SmsLog;
-// use Illuminate\Support\Facades\Log;
-
-// class PureSmsChannel
-// {
-//     public function send($notifiable, Notification $notification)
-//     {
-//         // Get the phone number and model ID for logging
-//         $recipientPhone = $notifiable->sms_number ?? null;
-//         $recipientId = $notifiable->id;
-
-//         // Get the message content and custom sender from the notification
-//         $data = $notification->toSms($notifiable);
-//         $message = $data['content'] ?? null;
-//         $from = $data['from'] ?? null;
-
-//         $response = PureSms::sendSms($recipientPhone, $message, $from, $recipientId);
-
-//         return $response;
-//     }
-// }
-
-
-
-
 
 class PureSmsChannel
 {
@@ -55,3 +26,32 @@ class PureSmsChannel
         $response = PureSms::sendSms($recipientPhone, $message, null, $recipientId);
     }
 }
+
+
+
+
+// namespace Puresms\Laravel\Channels;
+
+// use Illuminate\Notifications\Notification;
+// use Puresms\Laravel\Facades\PureSms;
+// use Puresms\Laravel\Models\SmsLog;
+// use Illuminate\Support\Facades\Log;
+
+// class PureSmsChannel
+// {
+//     public function send($notifiable, Notification $notification)
+//     {
+//         // Get the phone number and model ID for logging
+//         $recipientPhone = $notifiable->sms_number ?? null;
+//         $recipientId = $notifiable->id;
+
+//         // Get the message content and custom sender from the notification
+//         $data = $notification->toSms($notifiable);
+//         $message = $data['content'] ?? null;
+//         $from = $data['from'] ?? null;
+
+//         $response = PureSms::sendSms($recipientPhone, $message, $from, $recipientId);
+
+//         return $response;
+//     }
+// }
