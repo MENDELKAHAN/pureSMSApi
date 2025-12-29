@@ -23,11 +23,13 @@ class PureSmsChannel
         $recipientPhone = $notifiable->$phoneField ?? null;
         $recipientId = $notifiable->id; // Assuming the notifiable model has an id attribute
 
-        // Get the message content from the notification
-        $message = $notification->toSms($notifiable);
+        // Get the message content and custom sender from the notification
+        $data = $notification->toSms($notifiable);
+        $message = is_array($data) ? ($data['content'] ?? $data) : $data;
+        $from = is_array($data) ? ($data['from'] ?? null) : null;
 
-        // Send SMS using the PureSms package, passing recipient ID
-        $response = PureSms::sendSms($recipientPhone, $message, null, $recipientId);
+        // Send SMS using the PureSms package, passing recipient ID and custom sender
+        $response = PureSms::sendSms($recipientPhone, $message, $from, $recipientId);
     }
 }
 
