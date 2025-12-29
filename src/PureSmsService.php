@@ -29,7 +29,7 @@ class PureSmsService
     public function sendSms($to, $message, $from = null, $recipientId = null, $senderId = null)
     {
         $payload = [
-            'sender'    => $from ?? env('PURESMS_SENDER', 'ConnectTest'),
+            'sender'    => $from ?: env('PURESMS_SENDER', 'ConnectTest'),
             'recipient' => $to,
             'content'   => $message,
         ];
@@ -130,7 +130,7 @@ class PureSmsService
         $payload = [
             'messages' => array_map(function ($message) {
                 return [
-                    'sender' => $message['sender'] ?? env('PURESMS_SENDER', 'ConnectTest'),
+                    'sender' => $message['sender'] ?: env('PURESMS_SENDER', 'ConnectTest'),
                     'recipient' => $message['recipient'],
                     'content' => $message['content']
                 ];
