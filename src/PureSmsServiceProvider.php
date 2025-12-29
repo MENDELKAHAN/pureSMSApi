@@ -3,7 +3,9 @@
 namespace Puresms\Laravel;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route; // <-- The correct Route facade
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Notification;
+use Puresms\Laravel\Channels\PureSmsChannel;
 
 class PureSmsServiceProvider extends ServiceProvider
 {
@@ -18,6 +20,11 @@ class PureSmsServiceProvider extends ServiceProvider
 
   	public function boot()
     {
+        // Register the notification channel
+        Notification::extend('PureSmsChannel', function ($app) {
+            return new PureSmsChannel();
+        });
+
         if ($this->app->runningInConsole()) {
             // Publish config file
             $this->publishes([

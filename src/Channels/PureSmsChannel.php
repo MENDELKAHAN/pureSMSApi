@@ -1,5 +1,9 @@
 <?php
 
+namespace Puresms\Laravel\Channels;
+
+use Illuminate\Notifications\Notification;
+use Puresms\Laravel\Facades\PureSms;
 
 class PureSmsChannel
 {
