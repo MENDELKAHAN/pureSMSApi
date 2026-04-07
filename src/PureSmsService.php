@@ -189,49 +189,120 @@ class PureSmsService
         }
     }
 
-    public function handleWebhook(Request $request)
-    {
-        $payload = $request->all();
+    // public function handleWebhook(Request $request)
+    // {
+    //     $payload = $request->all();
 
-        if ($request->event_type === 2) {
-            return $this->handleInboundSms($request);
-        }
+    //     if ($request->event_type === 2) {
+    //         return $this->handleInboundSms($request);
+    //     }
 
-        $data = $request->input('data');
-        $data = array_change_key_case($data, CASE_LOWER);
+    //     $data = $request->input('data');
+    //     $data = array_change_key_case($data, CASE_LOWER);
 
-        if (empty($data)) {
-            Log::error('Webhook: no data or unrecognized payload');
-            return response()->json(['message' => 'Webhook processed, but no recognized content'], 200);
-        }
+    //     if (empty($data)) {
+    //         Log::error('Webhook: no data or unrecognized payload');
+    //         return response()->json(['message' => 'Webhook processed, but no recognized content'], 200);
+    //     }
 
-        Log::info('PureSMS Webhook:', [
-            'MessageId'   => $data['messageid'] ?? null,
-            'Status'      => $data['deliverystatus'] ?? null,
-            'ErrorCode'   => $data['errorcode'] ?? null,
-            'ProcessedAt' => $data['processedat'] ?? null,
-            'DeliveredAt' => $data['deliveredat'] ?? null,
-        ]);
+    //     Log::info('PureSMS Webhook:', [
+    //         'MessageId'   => $data['messageid'] ?? null,
+    //         'Status'      => $data['deliverystatus'] ?? null,
+    //         'ErrorCode'   => $data['errorcode'] ?? null,
+    //         'ProcessedAt' => $data['processedat'] ?? null,
+    //         'DeliveredAt' => $data['deliveredat'] ?? null,
+    //     ]);
 
-        $processedAt = isset($data['processedat'])
-            ? (new \DateTime($data['processedat']))->format('Y-m-d H:i:s')
-            : null;
+    //     $processedAt = isset($data['processedat'])
+    //         ? (new \DateTime($data['processedat']))->format('Y-m-d H:i:s')
+    //         : null;
 
-        $deliveredAt = isset($data['deliveredat'])
-            ? (new \DateTime($data['deliveredat']))->format('Y-m-d H:i:s')
-            : null;
+    //     $deliveredAt = isset($data['deliveredat'])
+    //         ? (new \DateTime($data['deliveredat']))->format('Y-m-d H:i:s')
+    //         : null;
 
-        SmsLog::where('message_id', $data['messageid'] ?? null)
-            ->update([
-                'status'       => $this->mapDeliveryStatus($data['deliverystatus'] ?? null),
-                'error_code'   => $data['errorcode'] ?? null,
-                'processed_at' => $processedAt,
-                'delivered_at' => $deliveredAt,
-            ]);
+    //     SmsLog::where('message_id', $data['messageid'] ?? null)
+    //         ->update([
+    //             'status'       => $this->mapDeliveryStatus($data['deliverystatus'] ?? null),
+    //             'error_code'   => $data['errorcode'] ?? null,
+    //             'processed_at' => $processedAt,
+    //             'delivered_at' => $deliveredAt,
+    //         ]);
 
-        return response()->json(['message' => 'Delivery status processed'], 200);
+    //     return response()->json(['message' => 'Delivery status processed'], 200);
+    // }
+
+   
+   
+
+public function handleWebhook(Request $request)
+{
+    $payload = $request->all();
+
+    Log::info('PureSMS Webhook full payload', [
+        'headers' => $request->headers->all(),
+        'query'   => $request->query(),
+        'payload' => $payload,
+        'raw'     => $request->getContent(),
+    ]);
+
+    if ((int) $request->input('event_type') === 2) {
+        return $this->handleInboundSms($request);
     }
 
+    $data = $request->input('data', []);
+    $data = array_change_key_case($data, CASE_LOWER);
+
+    if (empty($data)) {
+        Log::error('Webhook: no data or unrecognized payload');
+        return response()->json([
+            'message' => 'Webhook processed, but no recognized content',
+        ], 200);
+    }
+
+    $messageId = isset($data['messageid']) ? (string) $data['messageid'] : null;
+
+    $processedAt = !empty($data['processedat'])
+        ? Carbon::parse($data['processedat'])->format('Y-m-d H:i:s')
+        : null;
+
+    $deliveredAt = !empty($data['deliveredat'])
+        ? Carbon::parse($data['deliveredat'])->format('Y-m-d H:i:s')
+        : null;
+
+    Log::info('PureSMS Webhook parsed data', [
+        'message_id'   => $messageId,
+        'status'       => $data['deliverystatus'] ?? null,
+        'error_code'   => $data['errorcode'] ?? null,
+        'processed_at' => $processedAt,
+        'delivered_at' => $deliveredAt,
+    ]);
+
+    if (!$messageId) {
+        Log::error('Webhook: missing message_id', ['data' => $data]);
+
+        return response()->json([
+            'message' => 'Webhook processed, but message_id missing',
+        ], 200);
+    }
+
+    $updated = SmsLog::where('message_id', $messageId)->update([
+        'status'       => $this->mapDeliveryStatus($data['deliverystatus'] ?? null),
+        'error_code'   => $data['errorcode'] ?? null,
+        'processed_at' => $processedAt,
+        'delivered_at' => $deliveredAt,
+    ]);
+
+    Log::info('PureSMS Webhook update result', [
+        'message_id'    => $messageId,
+        'rows_updated'  => $updated,
+    ]);
+
+    return response()->json([
+        'message' => 'Delivery status processed',
+    ], 200);
+}
+   
     protected function handleInboundSms(Request $request)
     {
         $data = array_change_key_case($request->data, CASE_LOWER);
