@@ -193,15 +193,6 @@ class PureSmsService
     {
         $payload = $request->all();
 
-        if (config('puresms.webhook_log_payload', false)) {
-            Log::info('PureSMS Webhook full payload', [
-                'headers' => $request->headers->all(),
-                'query'   => $request->query(),
-                'payload' => $payload,
-                'raw'     => $request->getContent(),
-            ]);
-        }
-
         if ($request->event_type === 2) {
             return $this->handleInboundSms($request);
         }
