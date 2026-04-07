@@ -20,7 +20,7 @@ return new class extends Migration {
 
             $table->text('content');
             $table->string('status')->default('pending');
-            $table->integer('error_code')->nullable();
+            $table->string('error_code')->nullable();
             $table->timestamp('processed_at')->nullable();
             $table->timestamp('delivered_at')->nullable();
             $table->timestamps();
