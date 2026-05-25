@@ -336,9 +336,9 @@ public function handleWebhook(Request $request)
         $modelClass = $this->numberModel;
         $sender_id = ($modelClass::where($this->mobileNumber, $sender)->first())?->id;
 
-        try {
-            $smsLog = SmsLog::create([
-                'message_id'   => $messageId,
+        SmsLog::firstOrCreate(
+            ['message_id' => $messageId],
+            [
                 'recipient'    => $inboundNumber,
                 'sender'       => $sender,
                 'content'      => $body,
@@ -347,15 +347,8 @@ public function handleWebhook(Request $request)
                 'delivered_at' => $receivedAtFormatted,
                 'error_code'   => null,
                 'sender_id'    => $sender_id,
-            ]);
-        } catch (\Illuminate\Database\QueryException $e) {
-            Log::warning('Duplicate SMS log prevented:', [
-                'error'      => $e->getMessage(),
-                'message_id' => $messageId,
-            ]);
-
-            return response()->json(['message' => 'Duplicate entry ignored'], 200);
-        }
+            ]
+        );
 
         return response()->json(['message' => 'Inbound SMS processed'], 200);
     }
