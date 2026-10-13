@@ -2,60 +2,38 @@
 
 namespace Puresms\Laravel;
 
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\ServiceProvider;
 use Puresms\Laravel\Channels\PureSmsChannel;
+use Puresms\Laravel\Http\Controllers\WebhookController;
 
 class PureSmsServiceProvider extends ServiceProvider
 {
     public function register()
     {
         $this->mergeConfigFrom(__DIR__.'/../config/puresms.php', 'puresms');
-
-        $this->app->singleton('puresms', function () {
-            return new PureSmsService();
-        });
+        $this->app->singleton('puresms', fn () => new PureSmsService);
     }
 
-  	public function boot()
+    public function boot()
     {
-        // Register the notification channel
-        Notification::extend('PureSmsChannel', function ($app) {
-            return new PureSmsChannel();
-        });
+        Notification::extend('PureSmsChannel', fn () => new PureSmsChannel);
 
         if ($this->app->runningInConsole()) {
-            // Publish config file
             $this->publishes([
                 __DIR__.'/../config/puresms.php' => config_path('puresms.php'),
             ], 'puresms-config');
 
-            // Publish migrations
             $this->publishes([
                 __DIR__.'/../database/migrations/' => database_path('migrations'),
             ], 'puresms-migrations');
         }
 
-        // Load routes from the package
-        $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
-
-
-    
-
-
-
-    /**
-         * -----------------------------------------------------
-         * Define your route macro here:
-         * -----------------------------------------------------
-         */
+        // Applications explicitly opt in to a signed webhook; no public send routes.
         Route::macro('puresmsWebhooks', function ($uri = 'puresms-webhook') {
-            return Route::post($uri, [\Puresms\Laravel\Http\Controllers\WebhookController::class, 'handleWebhook'])
-        ->name('puresms.webhook');
-});
-
+            return Route::post($uri, [WebhookController::class, 'handleWebhook'])
+                ->name('puresms.webhook');
+        });
     }
 }
-
-
