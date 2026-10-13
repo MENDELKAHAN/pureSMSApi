@@ -1,110 +1,197 @@
-# PureSMS for Laravel
+# 📲 PureSMS API Laravel Package
 
-Send SMS through PureSMS and store send/delivery logs in Laravel 10–13. Laravel's own PHP requirement applies (Laravel 13 requires PHP 8.3 or later).
+This Laravel package provides a **simple and reusable integration** with the **PureSMS API**.  
+It allows you to **send SMS messages**, **handle webhooks**, and **store SMS logs in the database**.
 
-## Installation
+---
 
-```sh
-composer require mendelkahan/laravel-puresms:^1.1.4
+## 🚀 Features
+✅ Send **single** and **bulk** SMS messages  
+✅ Store **SMS logs** in the database  
+✅ Handle **webhooks** to update delivery status and handle inbound SMS  
+✅ Works with **Laravel's service provider and facade**  
+✅ Installable via **Composer**  
+✅ Configurable model and phone number field for flexible integration  
+
+---
+
+## 📦 Installation
+
+First, install the package via Composer:
+
+```bash
+composer require mendelkahan/puresmsapi
+```
+
+Then, publish the configuration and migration files:
+
+```bash
 php artisan vendor:publish --tag=puresms-config
 php artisan vendor:publish --tag=puresms-migrations
 php artisan migrate
 ```
 
-Configure the application environment; never commit account credentials:
+Set up your API key, endpoint, and optional model configuration in `.env`:
 
-```dotenv
-PURESMS_API_KEY=your_api_key
+```bash
+PURESMS_API_KEY=your_api_key_here
 PURESMS_ENDPOINT=https://connect-api.divergent.cloud
-PURESMS_SENDER=your_approved_sender
+PURESMS_SENDER=ConnectTest
 PURESMS_NUMBER_MODEL=App\Models\User
 PURESMS_MOBILE_NUMBER=sms_number
 ```
 
-The sender is `config('puresms.sender')`. A previously published configuration may contain the old, incorrect `puresms` key: rename it to `sender`. Rebuild your application's configuration cache after changing settings. `config/puresms.php` also supports HTTP `timeout` (20 seconds), `connect_timeout` (5 seconds), and a configurable SMS log `model` (default `Puresms\Laravel\Models\SmsLog`). API endpoints must use HTTPS. Redirects are disabled to protect the API key.
+> **Note**: The `PURESMS_NUMBER_MODEL` and `PURESMS_MOBILE_NUMBER` are optional. By default, the package uses the `User` model and `sms_number` field. You can set these to another model (e.g., `App\Models\People`) and field (e.g., `phone_number`) for projects where phone numbers are stored differently.
 
-The package does **not register sending or webhook routes automatically**. Keep sending behind your own authenticated, authorized application actions. Applications upgrading from 1.1.3 must replace any dependency on the old public `/send-sms` route.
+---
 
-## Send one SMS
+## 📤 Sending SMS
 
-```php
+You can send an SMS using the `PureSms` facade:
+
+```bash
 use Puresms\Laravel\Facades\PureSms;
 
-$result = PureSms::sendSms('+447123456789', 'Your repair is ready.', 'YourSender');
+$response = PureSms::sendSms('+447123456789', 'Hello from Laravel!');
 ```
 
-The signature remains `sendSms($to, $message, $from = null, $recipientId = null, $senderId = null)`. It posts `sender`, `recipient`, and `content` to `/sms/send` with an `X-API-Key` header.
+### Bulk SMS Example
 
-The result has `status` (`sent`, `failed`, or `unknown`), `message_id`, and `error`. A valid success response must contain a nonempty scalar `id`. `sent` means the provider accepted the request; it does not mean the phone received it. HTTP responses also include `http_status`, `body`, `headers`, and `log_saved`. Avoid displaying or logging raw provider responses.
+Send SMS to multiple recipients using a configurable model (e.g., `People`):
 
-- `failed`: validation/local log creation failed before sending, or the provider returned a definite client rejection (4xx other than 408).
-- `unknown`: timeout/connection error, 408, 5xx, redirect, or an ambiguous success response. The provider may have sent the message. **Check the provider before retrying.**
-- `sent` with `log_saved=false`: the provider accepted the SMS, but saving its result failed. Preserve the returned ID for reconciliation; do not send again to repair logging.
+```bash
+use Puresms\Laravel\Facades\PureSms;
+use App\Models\People;
 
-One pending log is created before the single-send HTTP request. Logs record sender, recipient, message, optional model IDs, status, and provider message ID. Application logs contain only operational status, not message bodies, account keys, or callback headers. Message content and phone numbers remain personal data in the `sms_logs` database table: apply your application's permissions and retention policy.
+$puresms = app(Puresms\Laravel\PureSmsService::class);
+$people = People::get();
 
-There are no automatic HTTP retries, provider idempotency keys, or balance/account-verification methods in this package. Queue jobs must not retry an ambiguous send blindly. A process killed during a request can leave a pending log requiring reconciliation.
+$messages = $people->map(function ($person) {
+    return [
+        'sender' => 'ConnectTest',
+        'recipient' => $person->phone_number ?? '',
+        'content' => "Hello {$person->name}, welcome!",
+    ];
+})->filter(fn ($msg) => !empty($msg['recipient']))->toArray();
 
-## Separate account configuration
+$response = $puresms->sendSmsBatch($messages);
+```
 
-Pass overrides to a fresh service instance when using multiple accounts or a long-lived worker:
+---
+
+## 📥 Handling Webhooks
+
+Set up a route to handle PureSMS webhooks:
+
+```bash
+use App\Http\Controllers\SmsController;
+
+Route::post('/puresms-webhook', [SmsController::class, 'handleWebhook']);
+
+// Or use the provided route macro
+Route::puresmsWebhooks('puresms-webhook');
+```
+
+The package automatically processes delivery status updates and inbound SMS, linking them to the configured model (e.g., `User` or `People`) based on the phone number.
+
+---
+
+## 📊 Database Logging
+
+All sent and received messages are **automatically stored** in the `sms_logs` table.
+
+| Column          | Type       | Description                                |
+|-----------------|------------|--------------------------------------------|
+| `id`            | bigint     | Auto-incrementing ID                      |
+| `message_id`    | string     | Unique message ID from PureSMS            |
+| `recipient`     | string     | Recipient's phone number                  |
+| `sender`        | string     | Sender name or number                     |
+| `recipient_id`  | int        | Recipient's ID from configured model      |
+| `sender_id`     | int        | Sender's ID from configured model         |
+| `content`       | text       | SMS message content                       |
+| `status`        | string     | `pending`, `sent`, `delivered`, `received`, etc. |
+| `error_code`    | integer    | Error code (if any)                       |
+| `processed_at`  | timestamp  | When it was processed                     |
+| `delivered_at`  | timestamp  | When it was delivered                     |
+
+---
+
+## 🎯 Example Usage
+
+### Send an SMS & Check Delivery Status
+
+```bash
+use Puresms\Laravel\Facades\PureSms;
+use Puresms\Laravel\Models\SmsLog;
+
+// Send an SMS
+$sms = PureSms::sendSms('+447123456789', 'Test message');
+
+// Check SMS Status in the database
+$log = SmsLog::where('message_id', $sms['message_id'])->first();
+echo 'Status: ' . $log->status;
+```
+
+### Using Tinker for Bulk SMS
+
+Open Tinker:
+
+```bash
+php artisan tinker
+```
+
+Example with a `People` model (assuming `phone_number` field):
+
+```bash
+$puresms = app(Puresms\Laravel\PureSmsService::class);
+$people = App\Models\People::get();
+
+$messages = $people->map(function ($person) {
+    return [
+        'sender' => 'ConnectTest',
+        'recipient' => $person->phone_number ?? '',
+        'content' => "Hello {$person->name}, welcome!",
+    ];
+})->filter(fn ($msg) => !empty($msg['recipient']))->toArray();
+
+$response = $puresms->sendSmsBatch($messages);
+```
+
+---
+
+## 🛠️ Updating the Package
+
+To update to the latest version:
+
+```bash
+composer update mendelkahan/puresmsapi
+php artisan migrate
+```
+
+---
+
+## ⚙️ Configuration
+
+The configuration file (`config/puresms.php`) allows you to customize the package:
 
 ```php
-use Puresms\Laravel\PureSmsService;
-
-$sms = new PureSmsService([
-    'api_key' => $secureAccountKey,
-    'endpoint' => 'https://connect-api.divergent.cloud',
-    'sender' => 'YourSender',
-    'number_model' => App\Models\Customer::class,
-    'mobile_number' => 'mobile',
-]);
-$result = $sms->sendSms($approvedTestNumber, 'Integration test');
+return [
+    'api_key' => env('PURESMS_API_KEY', ''),
+    'endpoint' => env('PURESMS_ENDPOINT', 'https://connect-api.divergent.cloud'),
+    'sender' => env('PURESMS_SENDER', 'ConnectTest'),
+    'number_model' => env('PURESMS_NUMBER_MODEL', \App\Models\User::class),
+    'mobile_number' => env('PURESMS_MOBILE_NUMBER', 'sms_number'),
+];
 ```
 
-This does not mutate global configuration. The package has no sandbox or test-recipient mode: use `Http::fake()` for automated tests and enforce a test-number allowlist in the application before making any real request. A master account key can incur charges for every real send.
+- `number_model`: The Eloquent model containing phone numbers (default: `App\Models\User`).
+- `mobile_number`: The field name for the phone number in the model (default: `sms_number`).
 
-## Bulk SMS
+For example, to use a `People` model with a `phone_number` field, set in `.env`:
 
-`sendSmsBatch(array $messages, ?string $sendAtUtc = null)` posts `{messages: [...], sendAtUtc?: ...}` to `/sms/send/bulk`. Each message contains `sender` (optional), `recipient`, and `content`. It returns `status` (`success`, `failed`, `unknown`), `batch_id`, `message_count`, `body`, `headers`, and `log_saved` when an HTTP response is received.
-
-The current database schema does not store batch IDs or per-message bulk IDs, so individual bulk delivery callbacks cannot be correlated reliably. Do not use bulk sending where per-recipient delivery tracking is required. Unknown results must be reconciled before retrying.
-
-## Optional signed webhooks
-
-Register a webhook only after confirming the provider's signing configuration. This package enforces the signing format already present in the original package; **it has not been verified against a live PureSMS callback**:
-
-- `X-Webhook-Timestamp`: Unix timestamp in seconds.
-- `X-Webhook-Signature`: base64 of binary HMAC-SHA256 over `timestamp + raw request body`, using the webhook secret.
-- Timestamp must be within `webhook_tolerance` seconds of the server clock (default 300).
-
-Set a separate `PURESMS_WEBHOOK_SECRET` and explicitly register an API route:
-
-```php
-use Illuminate\Support\Facades\Route;
-
-Route::puresmsWebhooks('puresms-webhook')->middleware('throttle:60,1');
+```bash
+PURESMS_NUMBER_MODEL=App\Models\People
+PURESMS_MOBILE_NUMBER=phone_number
 ```
 
-Use the actual URL produced by your application's API prefix. Missing/invalid signatures or stale timestamps return 403 before any payload processing. The legacy `services.puresms.webhook_secret` setting remains a fallback; never disable verification to work around a mismatched provider contract. Applications registering the route in `web.php` must deliberately configure the framework's CSRF handling for this signed machine endpoint.
-
-Payloads use `data.MessageId`, `data.DeliveryStatus`, `data.ErrorCode`, `data.ProcessedAt`, and `data.DeliveredAt` (field case is ignored). Delivery codes `1`, `2`, and `7` map to `processing`, `failed`, and `delivered`; numeric strings are accepted. A delivered message cannot be regressed by an older callback.
-
-Inbound payloads use `event_type=2` and `data.MessageId`, `InboundNumber`, `Sender`, `Body`, `ReceivedAt`. The configured number model/field locates the sender. Duplicate message IDs do not create additional logs. Database failures are not acknowledged as successful receipt.
-
-## Testing and updating
-
-The tests use mocked HTTP and in-memory SQLite; they do not bootstrap an application's environment or send messages. To run using an existing Laravel application's dependencies (PHPUnit 12 and Laravel 13 were tested):
-
-```powershell
-$env:PURESMS_TEST_AUTOLOAD = 'C:\path\to\app\vendor\autoload.php'
-php C:\path\to\app\vendor\phpunit\phpunit\phpunit --bootstrap tests/bootstrap.php tests/PureSmsServiceTest.php
-```
-
-To update an installed release:
-
-```sh
-composer update mendelkahan/laravel-puresms
-```
-
-Review changes to published configuration and migrations before deployment. Version 1.1.4 adds no database migration; it changes HTTP failure results to explicit status strings and requires authenticated, fresh webhook signatures.
+This ensures compatibility with existing projects using the `User` model while allowing flexibility for new setups.

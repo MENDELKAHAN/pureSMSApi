@@ -1,4 +1,11 @@
 <?php
 
-// No routes are registered automatically. Applications can explicitly register
-// Route::puresmsWebhooks() in their API routes after configuring webhook signing.
+use Illuminate\Support\Facades\Route;
+use Puresms\Laravel\Http\Controllers\SmsController;
+use Puresms\Laravel\Http\Controllers\WebhookController;
+
+
+Route::get('/send-sms', [SmsController::class, 'sendSms']);
+Route::post('/puresms-webhook', [WebhookController::class, 'handleWebhook']);
+
+

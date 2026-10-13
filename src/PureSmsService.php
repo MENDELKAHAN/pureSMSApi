@@ -2,300 +2,381 @@
 
 namespace Puresms\Laravel;
 
-use App\Models\User;
-use Carbon\Carbon;
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Http\JsonResponse;
+use Puresms\Laravel\Models\SmsLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Puresms\Laravel\Models\SmsLog;
-use Symfony\Component\HttpKernel\Exception\HttpException;
+use Carbon\Carbon;
 
 class PureSmsService
 {
-    protected array $options;
+    protected $apiKey;
+    protected $endpoint;
+    protected $numberModel;
+    protected $mobileNumber;
 
-    public function __construct(array $options = [])
+    public function __construct()
     {
-        $this->options = array_replace((array) config('puresms', []), $options);
+        $this->apiKey = config('puresms.api_key');
+        $this->endpoint = config('puresms.endpoint');
+        $this->numberModel = config('puresms.number_model', \App\Models\User::class);
+        $this->mobileNumber = config('puresms.mobile_number', 'sms_number');
     }
 
     /**
-     * Send once. An unknown result must be reconciled before any retry.
+     * Send an SMS and store it in the database.
      */
     public function sendSms($to, $message, $from = null, $recipientId = null, $senderId = null)
     {
         $payload = [
-            'sender' => $from ?: ($this->options['sender'] ?? 'ConnectTest'),
+            'sender'    => $from ?: env('PURESMS_SENDER', 'ConnectTest'),
             'recipient' => $to,
-            'content' => $message,
+            'content'   => $message,
         ];
 
-        if (! $this->validConfiguration() || ! $this->validMessage($payload)) {
-            return $this->failure('failed', 'Invalid SMS configuration or message.', 'invalid_configuration');
-        }
+        $jsonPayload = json_encode($payload);
 
-        $model = $this->options['model'] ?? SmsLog::class;
         try {
-            // Persist before sending, so a failed database write never sends an untracked SMS.
-            $log = $model::create([
-                'recipient' => $to,
-                'sender' => $payload['sender'],
+            $response = Http::withHeaders([
+                'Content-Type'   => 'application/json',
+                'Content-Length' => strlen($jsonPayload),
+                'X-API-Key'      => $this->apiKey,
+            ])->post("{$this->endpoint}/sms/send", $payload);
+
+            if ($response->failed()) {
+                Log::error('PureSMS API request failed', [
+                    'status'     => $response->status(),
+                    'body'       => $response->body(),
+                    'headers'    => $response->headers(),
+                    'to'         => $to,
+                    'from'       => $from,
+                    'message'    => $message,
+                    'recipient_id' => $recipientId,
+                    'sender_id'    => $senderId,
+                ]);
+
+                SmsLog::create([
+                    'message_id'   => null,
+                    'recipient_id' => $recipientId,
+                    'sender_id'    => $senderId,
+                    'content'      => $message,
+                    'status'       => 'failed',
+                    'error_code'   => $response->status(),
+                    'processed_at' => now(),
+                ]);
+
+                return [
+                    'error'   => true,
+                    'message' => 'API call failed',
+                    'status'  => $response->status(),
+                ];
+            }
+
+            $responseData = $response->json();
+            $status = isset($responseData['id']) ? 'sent' : 'failed';
+            $messageId = $responseData['id'] ?? null;
+
+            SmsLog::create([
+                'message_id'   => $messageId,
                 'recipient_id' => $recipientId,
-                'sender_id' => $senderId,
-                'content' => $message,
-                'status' => 'pending',
+                'sender_id'    => $senderId,
+                'content'      => $message,
+                'status'       => $status,
+                'error_code'   => $status === 'sent' ? null : $response->status(),
+                'processed_at' => now(),
             ]);
-        } catch (\Throwable $e) {
-            Log::error('PureSMS could not create a send log');
 
-            return $this->failure('failed', 'SMS was not sent because its log could not be saved.', 'log_unavailable');
+            Log::info('PureSMS API successful response', [
+                'status'  => $response->status(),
+                'body'    => $response->body(),
+                'headers' => $response->headers(),
+            ]);
+
+            return [
+                'status'     => $status,
+                'message_id' => $messageId,
+                'body'       => $responseData,
+                'headers'    => $response->headers(),
+            ];
+        } catch (\Exception $e) {
+            Log::error('PureSMS API exception thrown', [
+                'error'        => $e->getMessage(),
+                'to'           => $to,
+                'from'         => $from,
+                'message'      => $message,
+                'recipient_id' => $recipientId,
+                'sender_id'    => $senderId,
+            ]);
+
+            SmsLog::create([
+                'message_id'   => null,
+                'recipient_id' => $recipientId,
+                'sender_id'    => $senderId,
+                'content'      => $message,
+                'status'       => 'failed',
+                'error_code'   => 'exception',
+                'processed_at' => now(),
+            ]);
+
+            return [
+                'error'   => true,
+                'message' => $e->getMessage(),
+            ];
         }
-
-        try {
-            $response = $this->http()->post($this->endpoint().'/sms/send', $payload);
-        } catch (\Throwable $e) {
-            $saved = $this->updateLog($log, ['status' => 'unknown', 'error_code' => 'transport_error', 'processed_at' => now()]);
-
-            return $this->failure('unknown', 'The SMS result is unknown. Check with the provider before retrying.', 'transport_error')
-                + ['log_saved' => $saved];
-        }
-
-        $body = $response->json();
-        $id = is_array($body) ? ($body['id'] ?? null) : null;
-        $validId = (is_string($id) || is_int($id)) && trim((string) $id) !== '';
-        $status = $response->successful() && $validId ? 'sent'
-            : ($response->clientError() && $response->status() !== 408 ? 'failed' : 'unknown');
-        $messageId = $status === 'sent' ? (string) $id : null;
-        $saved = $this->updateLog($log, [
-            'message_id' => $messageId,
-            'status' => $status,
-            'error_code' => $status === 'sent' ? null : (string) $response->status(),
-            'processed_at' => now(),
-        ]);
-
-        Log::info('PureSMS send result', ['status' => $status, 'http_status' => $response->status(), 'log_saved' => $saved]);
-
-        return [
-            'error' => $status !== 'sent',
-            'status' => $status,
-            'message_id' => $messageId,
-            'http_status' => $response->status(),
-            'body' => $body,
-            'headers' => $response->headers(),
-            'log_saved' => $saved,
-            'message' => match ($status) {
-                'sent' => 'SMS accepted by the provider.',
-                'failed' => 'SMS rejected by the provider.',
-                default => 'The SMS result is unknown. Check with the provider before retrying.',
-            },
-        ];
     }
 
     public function sendSmsBatch(array $messages, ?string $sendAtUtc = null)
     {
-        $messages = array_map(fn ($message) => [
-            'sender' => $message['sender'] ?? ($this->options['sender'] ?? 'ConnectTest'),
-            'recipient' => $message['recipient'] ?? null,
-            'content' => $message['content'] ?? null,
-        ], $messages);
-        if (! $this->validConfiguration() || $messages === [] || array_filter($messages, fn ($message) => ! $this->validMessage($message))) {
-            return $this->failure('failed', 'Invalid SMS configuration or message.', 'invalid_configuration');
-        }
+        $payload = [
+            'messages' => array_map(function ($message) {
+                return [
+                    'sender' => $message['sender'] ?: env('PURESMS_SENDER', 'ConnectTest'),
+                    'recipient' => $message['recipient'],
+                    'content' => $message['content']
+                ];
+            }, $messages)
+        ];
 
-        $payload = ['messages' => $messages];
         if ($sendAtUtc) {
             $payload['sendAtUtc'] = $sendAtUtc;
         }
 
-        try {
-            $response = $this->http()->post($this->endpoint().'/sms/send/bulk', $payload);
-        } catch (\Throwable $e) {
-            return $this->failure('unknown', 'The bulk SMS result is unknown. Check with the provider before retrying.', 'transport_error');
-        }
+        $jsonPayload = json_encode($payload);
 
-        $body = $response->json();
-        $batchId = is_array($body) ? ($body['batchId'] ?? null) : null;
-        $validId = (is_string($batchId) || is_int($batchId)) && trim((string) $batchId) !== '';
-        $status = $response->successful() && $validId ? 'success'
-            : ($response->clientError() && $response->status() !== 408 ? 'failed' : 'unknown');
-        $saved = true;
-        $model = $this->options['model'] ?? SmsLog::class;
-        foreach ($messages as $message) {
-            try {
-                $model::create($message + [
-                    'status' => $status === 'success' ? 'sent' : $status,
-                    'error_code' => $status === 'success' ? null : (string) $response->status(),
+        try {
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'Content-Length' => strlen($jsonPayload),
+                'X-API-Key' => $this->apiKey,
+            ])->post("{$this->endpoint}/sms/send/bulk", $payload);
+
+            $responseData = $response->json();
+
+            foreach ($messages as $message) {
+                SmsLog::create([
+                    'batch_id' => $responseData['batchId'] ?? null,
+                    'recipient' => $message['recipient'],
+                    'sender' => $message['sender'] ?? env('PURESMS_SENDER', 'ConnectTest'),
+                    'content' => $message['content'],
+                    'status' => $response->successful() ? 'sent' : 'failed',
+                    'error_code' => $response->successful() ? null : $response->status(),
                     'processed_at' => now(),
                 ]);
-            } catch (\Throwable $e) {
-                $saved = false;
-                Log::error('PureSMS could not save a bulk send log');
             }
-        }
 
-        return [
-            'error' => $status !== 'success',
-            'status' => $status,
-            'batch_id' => $status === 'success' ? (string) $batchId : null,
-            'message_count' => is_array($body) ? ($body['messageCount'] ?? null) : null,
-            'body' => $body,
-            'headers' => $response->headers(),
-            'log_saved' => $saved,
-        ];
-    }
-
-    public function handleWebhook(Request $request)
-    {
-        $this->validateWebhookSignature($request);
-        $data = $request->input('data');
-        if (! is_array($data)) {
-            throw new HttpException(422, 'Invalid webhook data.');
-        }
-
-        $data = array_change_key_case($data, CASE_LOWER);
-        if (! isset($data['messageid']) || ! is_scalar($data['messageid']) || trim((string) $data['messageid']) === '') {
-            throw new HttpException(422, 'Missing webhook message ID.');
-        }
-
-        if ((int) $request->input('event_type') === 2) {
-            return $this->handleInboundSms($data);
-        }
-
-        $status = $this->mapDeliveryStatus($data['deliverystatus'] ?? null);
-        if ($status === 'unknown') {
-            throw new HttpException(422, 'Unsupported delivery status.');
-        }
-
-        $model = $this->options['model'] ?? SmsLog::class;
-        // Delivery is terminal: delayed callbacks must not regress a delivered message.
-        $model::where('message_id', (string) $data['messageid'])
-            ->where('status', '!=', 'delivered')
-            ->update([
-                'status' => $status,
-                'error_code' => $data['errorcode'] ?? null,
-                'processed_at' => $this->timestamp($data['processedat'] ?? null),
-                'delivered_at' => $this->timestamp($data['deliveredat'] ?? null),
+            Log::info('PureSMS Bulk API Response:', [
+                'status' => $response->status(),
+                'batch_id' => $responseData['batchId'] ?? null,
+                'message_count' => $responseData['messageCount'] ?? null,
+                'body' => $response->body(),
+                'headers' => $response->headers()
             ]);
 
-        return new JsonResponse(['message' => 'Delivery status processed']);
+            return [
+                'status' => $response->successful() ? 'success' : 'failed',
+                'batch_id' => $responseData['batchId'] ?? null,
+                'message_count' => $responseData['messageCount'] ?? null,
+                'body' => $responseData,
+                'headers' => $response->headers()
+            ];
+        } catch (\Exception $e) {
+            Log::error('PureSMS Bulk API Error:', ['message' => $e->getMessage()]);
+
+            return [
+                'error' => true,
+                'message' => $e->getMessage()
+            ];
+        }
     }
 
-    protected function handleInboundSms(array $data)
+    // public function handleWebhook(Request $request)
+    // {
+    //     $payload = $request->all();
+
+    //     if ($request->event_type === 2) {
+    //         return $this->handleInboundSms($request);
+    //     }
+
+    //     $data = $request->input('data');
+    //     $data = array_change_key_case($data, CASE_LOWER);
+
+    //     if (empty($data)) {
+    //         Log::error('Webhook: no data or unrecognized payload');
+    //         return response()->json(['message' => 'Webhook processed, but no recognized content'], 200);
+    //     }
+
+    //     Log::info('PureSMS Webhook:', [
+    //         'MessageId'   => $data['messageid'] ?? null,
+    //         'Status'      => $data['deliverystatus'] ?? null,
+    //         'ErrorCode'   => $data['errorcode'] ?? null,
+    //         'ProcessedAt' => $data['processedat'] ?? null,
+    //         'DeliveredAt' => $data['deliveredat'] ?? null,
+    //     ]);
+
+    //     $processedAt = isset($data['processedat'])
+    //         ? (new \DateTime($data['processedat']))->format('Y-m-d H:i:s')
+    //         : null;
+
+    //     $deliveredAt = isset($data['deliveredat'])
+    //         ? (new \DateTime($data['deliveredat']))->format('Y-m-d H:i:s')
+    //         : null;
+
+    //     SmsLog::where('message_id', $data['messageid'] ?? null)
+    //         ->update([
+    //             'status'       => $this->mapDeliveryStatus($data['deliverystatus'] ?? null),
+    //             'error_code'   => $data['errorcode'] ?? null,
+    //             'processed_at' => $processedAt,
+    //             'delivered_at' => $deliveredAt,
+    //         ]);
+
+    //     return response()->json(['message' => 'Delivery status processed'], 200);
+    // }
+
+   
+   
+
+public function handleWebhook(Request $request)
+{
+    $payload = $request->all();
+
+    Log::info('PureSMS Webhook full payload', [
+        'headers' => $request->headers->all(),
+        'query'   => $request->query(),
+        'payload' => $payload,
+        'raw'     => $request->getContent(),
+    ]);
+
+    if ((int) $request->input('event_type') === 2) {
+        return $this->handleInboundSms($request);
+    }
+
+    $data = $request->input('data', []);
+    $data = array_change_key_case($data, CASE_LOWER);
+
+    if (empty($data)) {
+        Log::error('Webhook: no data or unrecognized payload');
+        return response()->json([
+            'message' => 'Webhook processed, but no recognized content',
+        ], 200);
+    }
+
+    $messageId = isset($data['messageid']) ? (string) $data['messageid'] : null;
+
+    $processedAt = !empty($data['processedat'])
+        ? Carbon::parse($data['processedat'])->format('Y-m-d H:i:s')
+        : null;
+
+    $deliveredAt = !empty($data['deliveredat'])
+        ? Carbon::parse($data['deliveredat'])->format('Y-m-d H:i:s')
+        : null;
+
+    Log::info('PureSMS Webhook parsed data', [
+        'message_id'   => $messageId,
+        'status'       => $data['deliverystatus'] ?? null,
+        'error_code'   => $data['errorcode'] ?? null,
+        'processed_at' => $processedAt,
+        'delivered_at' => $deliveredAt,
+    ]);
+
+    if (!$messageId) {
+        Log::error('Webhook: missing message_id', ['data' => $data]);
+
+        return response()->json([
+            'message' => 'Webhook processed, but message_id missing',
+        ], 200);
+    }
+
+    $updated = SmsLog::where('message_id', $messageId)->update([
+        'status'       => $this->mapDeliveryStatus($data['deliverystatus'] ?? null),
+        'error_code'   => $data['errorcode'] ?? null,
+        'processed_at' => $processedAt,
+        'delivered_at' => $deliveredAt,
+    ]);
+
+    Log::info('PureSMS Webhook update result', [
+        'message_id'    => $messageId,
+        'rows_updated'  => $updated,
+    ]);
+
+    return response()->json([
+        'message' => 'Delivery status processed',
+    ], 200);
+}
+   
+    protected function handleInboundSms(Request $request)
     {
-        foreach (['inboundnumber', 'sender', 'body'] as $field) {
-            if (! isset($data[$field]) || ! is_string($data[$field])) {
-                throw new HttpException(422, 'Invalid inbound SMS data.');
+        $data = array_change_key_case($request->data, CASE_LOWER);
+
+        $messageId     = $data['messageid'];
+        $inboundNumber = $data['inboundnumber'];
+        $sender        = $data['sender'];
+        $body          = $data['body'];
+        $receivedAt    = $data['receivedat'];
+
+        try {
+            $dt = new \DateTime($receivedAt);
+            if ($dt->format('Y') < 1000) {
+                $receivedAtFormatted = null;
+            } else {
+                $receivedAtFormatted = $dt->format('Y-m-d H:i:s');
             }
+        } catch (\Exception $e) {
+            $receivedAtFormatted = null;
+            Log::error('Invalid receivedAt timestamp: ' . $receivedAt);
         }
 
-        $numberModel = $this->options['number_model'] ?? User::class;
-        $senderId = $numberModel::where($this->options['mobile_number'] ?? 'sms_number', $data['sender'])->value('id');
-        $receivedAt = $this->timestamp($data['receivedat'] ?? null);
-        $model = $this->options['model'] ?? SmsLog::class;
-        $model::firstOrCreate(['message_id' => (string) $data['messageid']], [
-            'recipient' => $data['inboundnumber'],
-            'sender' => $data['sender'],
-            'content' => $data['body'],
-            'status' => 'received',
-            'processed_at' => $receivedAt,
-            'delivered_at' => $receivedAt,
-            'sender_id' => $senderId,
+        Log::info('Inbound SMS Webhook:', [
+            'messageId'     => $messageId,
+            'inboundNumber' => $inboundNumber,
+            'sender'        => $sender,
+            'body'          => $body,
+            'receivedAt'    => $receivedAtFormatted,
         ]);
 
-        return new JsonResponse(['message' => 'Inbound SMS processed']);
+        $modelClass = $this->numberModel;
+        $sender_id = ($modelClass::where($this->mobileNumber, $sender)->first())?->id;
+
+        SmsLog::firstOrCreate(
+            ['message_id' => $messageId],
+            [
+                'recipient'    => $inboundNumber,
+                'sender'       => $sender,
+                'content'      => $body,
+                'status'       => 'received',
+                'processed_at' => $receivedAtFormatted,
+                'delivered_at' => $receivedAtFormatted,
+                'error_code'   => null,
+                'sender_id'    => $sender_id,
+            ]
+        );
+
+        return response()->json(['message' => 'Inbound SMS processed'], 200);
     }
 
     protected function validateWebhookSignature(Request $request)
     {
-        $secret = $this->options['webhook_secret'] ?? config('services.puresms.webhook_secret');
-        $signature = $request->header('X-Webhook-Signature');
-        $timestamp = $request->header('X-Webhook-Timestamp');
-        $tolerance = max(1, (int) ($this->options['webhook_tolerance'] ?? 300));
+        $signature   = $request->header('X-Webhook-Signature');
+        $timestamp   = $request->header('X-Webhook-Timestamp');
+        $secretKey   = config('services.puresms.webhook_secret');
+        $body        = $request->getContent();
 
-        if (! is_string($secret) || trim($secret) === '' || ! is_string($signature) || ! is_string($timestamp)
-            || ! ctype_digit($timestamp) || abs(time() - (int) $timestamp) > $tolerance) {
-            throw new HttpException(403, 'Invalid webhook signature.');
-        }
+        $computedHmac = base64_encode(
+            hash_hmac('sha256', $timestamp . $body, $secretKey, true)
+        );
 
-        $expected = base64_encode(hash_hmac('sha256', $timestamp.$request->getContent(), $secret, true));
-        if (! hash_equals($expected, $signature)) {
-            throw new HttpException(403, 'Invalid webhook signature.');
-        }
-    }
-
-    private function http(): PendingRequest
-    {
-        return Http::acceptJson()->asJson()->withHeaders(['X-API-Key' => $this->options['api_key']])
-            ->timeout(max(1, (int) ($this->options['timeout'] ?? 20)))
-            ->connectTimeout(max(1, (int) ($this->options['connect_timeout'] ?? 5)))
-            ->withOptions(['allow_redirects' => false]);
-    }
-
-    private function endpoint(): string
-    {
-        return rtrim((string) ($this->options['endpoint'] ?? ''), '/');
-    }
-
-    private function validConfiguration(): bool
-    {
-        $endpoint = parse_url($this->endpoint());
-
-        return is_string($this->options['api_key'] ?? null) && trim($this->options['api_key']) !== ''
-            && is_array($endpoint) && ($endpoint['scheme'] ?? null) === 'https' && ! empty($endpoint['host'])
-            && ! isset($endpoint['user']) && ! isset($endpoint['pass']) && ! isset($endpoint['query']) && ! isset($endpoint['fragment']);
-    }
-
-    private function validMessage(array $payload): bool
-    {
-        foreach (['sender', 'recipient', 'content'] as $field) {
-            if (! is_string($payload[$field]) || trim($payload[$field]) === '') {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function updateLog($log, array $attributes): bool
-    {
-        try {
-            $log->update($attributes);
-
-            return true;
-        } catch (\Throwable $e) {
-            Log::error('PureSMS could not update a send log', ['status' => $attributes['status']]);
-
-            return false;
+        if (!hash_equals($computedHmac, $signature)) {
+            Log::error('Invalid webhook signature');
+            abort(403, 'Invalid webhook signature');
         }
     }
 
-    private function failure(string $status, string $message, string $code): array
+    private function mapDeliveryStatus($status)
     {
-        return ['error' => true, 'status' => $status, 'message' => $message, 'error_code' => $code, 'message_id' => null];
-    }
-
-    private function timestamp($value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        try {
-            return Carbon::parse($value)->utc()->format('Y-m-d H:i:s');
-        } catch (\Throwable $e) {
-            throw new HttpException(422, 'Invalid webhook timestamp.');
-        }
-    }
-
-    private function mapDeliveryStatus($status): string
-    {
-        return match ((string) $status) {
-            '1' => 'processing',
-            '2' => 'failed',
-            '7' => 'delivered',
-            default => 'unknown',
+        return match ($status) {
+            1 => 'processing',
+            2 => 'failed',
+            7 => 'delivered',
+            default => 'unknown'
         };
     }
 }
